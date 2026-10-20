@@ -27,7 +27,7 @@ def resolve_fallback(cfg):
 
 def load_cfg(a, persist=False):
     cfg = C.load()
-    for k in ("name", "source", "fallback", "shape", "tones"):
+    for k in ("name", "source", "fallback", "shape", "tones", "contexts"):
         v = getattr(a, k, None)
         if v is not None:
             cfg[k] = v
@@ -44,25 +44,36 @@ def cmd_preview(a):
     from .preview import contact_sheet
     cfg = load_cfg(a)
     _, jobs, _ = theme.plan(cfg)
-    items = [(n, p) for n, (kind, p) in sorted(jobs.items()) if kind == "convert"]
+    ctx = a.context
+    shape = theme.shape_for(cfg, ctx)
+    items = [(n, p) for (c, n), (kind, p) in sorted(jobs.items()) if c == ctx and kind == "convert"]
     if a.limit:
         items = items[: a.limit]
     t = time.time()
-    sheet, failed = contact_sheet(items, lambda p, s: convert(p, (s,), cfg["shape"], cfg["tones"])[0][s], a.columns)
+    def one(p, s):
+        if ctx == "status" and theme.is_monochrome(p):      # kept as it is, like generate does
+            from .iconfile import render
+            return render(p, s)
+        return convert(p, (s,), shape, cfg["tones"])[0][s]
+    sheet, failed = contact_sheet(items, one, a.columns)
     out = os.path.abspath(a.output)
     sheet.save(out)
     print(f"{len(items)} icons in {time.time() - t:.1f}s (failed {failed}) -> {out}")
 
 
 def cmd_generate(a):
+    if getattr(a, "contexts", None):
+        a.contexts = [c.strip() for c in a.contexts.split(",") if c.strip()]
     cfg = load_cfg(a, persist=True)
     fallback = resolve_fallback(cfg)
     t = time.time()
     s = theme.generate(cfg, fallback, dry_run=a.dry_run)
     if not a.quiet or s["failed"]:
         verb = "would convert" if a.dry_run else "converted"
-        print(f"{cfg['name']}: {verb} {s['converted']}, overrides {s['overrides']}, unchanged {s['unchanged']}, "
-              f"removed {s['removed']}, failed {len(s['failed'])} in {time.time() - t:.1f}s")
+        print(f"{cfg['name']}: {verb} {s['converted']}, aliases {s['linked']}, already mono {s['kept']}, overrides {s['overrides']}, "
+              f"unchanged {s['unchanged']}, removed {s['removed']}, failed {len(s['failed'])} "
+              f"in {time.time() - t:.1f}s")
+        print(f"  contexts: {', '.join(s['contexts']) or '-'}")
         print(f"  source: {s['source']}   inherits: {fallback}   folder: {C.theme_dir(cfg)}")
         for name, why in s["failed"]:
             print(f"  failed: {name}: {why}")
@@ -153,6 +164,8 @@ def build_parser():
     pv.add_argument("-o", "--output", default="monotile-preview.png")
     pv.add_argument("--columns", type=int, default=10)
     pv.add_argument("--limit", type=int, default=0)
+    pv.add_argument("--context", default="apps", choices=theme.CONTEXT_NAMES,
+                    help="which kind of icons to show (default: apps)")
     pv.set_defaults(func=cmd_preview)
 
     g = sub.add_parser("generate", parents=[style], help="create or update the icon theme")
@@ -160,6 +173,7 @@ def build_parser():
     g.add_argument("--refresh", action="store_true", help="make the desktop reload icons if anything changed")
     g.add_argument("-q", "--quiet", action="store_true")
     g.add_argument("-v", "--verbose", action="store_true", help="list skipped apps")
+    g.add_argument("--contexts", help="comma-separated kinds of icons to convert, e.g. apps,places,mimetypes")
     g.set_defaults(func=cmd_generate)
 
     ap = sub.add_parser("apply", parents=[style], help="generate if needed and switch the desktop to the theme")

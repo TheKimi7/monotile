@@ -61,20 +61,27 @@ class FakeDesktop(unittest.TestCase):
         if inherits:
             lines.append(f"Inherits={inherits}")
         for d, size in dirs.items():
+            context = None
+            if isinstance(size, tuple):
+                size, context = size
             if size == "scalable":
                 lines += [f"[{d}]", "Size=48", "Type=Scalable", "MinSize=8", "MaxSize=512"]
             else:
                 lines += [f"[{d}]", f"Size={size}", "Type=Fixed"]
+            if context:
+                lines.append(f"Context={context}")
             os.makedirs(os.path.join(base, d), exist_ok=True)
         with open(os.path.join(base, "index.theme"), "w") as f:
             f.write("\n".join(lines) + "\n")
         return base
 
-    def add_icon(self, theme, subdir, name, kind="png", where=None):
+    def add_icon(self, theme, subdir, name, kind="png", where=None, mono=False):
         d = os.path.join(where or self.sys, "icons", theme, subdir)
         os.makedirs(d, exist_ok=True)
         path = os.path.join(d, f"{name}.{kind}")
-        if kind == "png":
+        if kind == "png" and mono:
+            plate_icon_png(path, plate=(230, 230, 230), glyph=(40, 40, 40))
+        elif kind == "png":
             plate_icon_png(path)
         else:
             with open(path, "w") as f:

@@ -59,6 +59,25 @@ class App:
         return n if SAFE_NAME.match(n) and ".." not in n else None
 
 
+def menu_category_icons():
+    """Icon names used by the application menu's categories (.directory files)."""
+    names = set()
+    for d in data_dirs():
+        ddir = os.path.join(d, "desktop-directories")
+        if not os.path.isdir(ddir):
+            continue
+        for f in os.listdir(ddir):
+            if f.endswith(".directory"):
+                with open(os.path.join(ddir, f), encoding="utf-8", errors="ignore") as fh:
+                    for line in fh:
+                        if line.startswith("Icon="):
+                            n = line.strip()[5:]
+                            if SAFE_NAME.match(n) and ".." not in n:
+                                names.add(n)
+                            break
+    return names
+
+
 def installed_apps():
     """Desktop entries in precedence order; the first file with an ID wins."""
     found = {}
@@ -120,32 +139,40 @@ class Theme:
                 s = cp[d]
                 size = int(s.get("Size", "0") or 0) * int(s.get("Scale", "1") or 1)
                 scalable = s.get("Type", "Threshold") == "Scalable"
-                self.dirs.append((d, 10_000 if scalable else size))
+                self.dirs.append((d, 10_000 if scalable else size, s.get("Context", "")))
         self._index = None
 
     @property
     def exists(self):
         return bool(self.roots)
 
-    def index(self):
-        """name -> (score, path), best (largest / scalable) file per name."""
+    def index(self, context=None):
+        """name -> (score, path), best (largest / scalable) file per name.
+        With `context` (e.g. "MimeTypes"), only directories of that context and
+        never symbolic ones."""
+        if context is not None:
+            return self._scan([(d, sc) for d, sc, ctx in self.dirs
+                               if ctx == context and "symbolic" not in d])
         if self._index is None:
-            idx = {}
-            for root in self.roots:
-                for d, score in self.dirs:
-                    full = os.path.realpath(os.path.join(root, d))
-                    try:
-                        files = os.listdir(full)
-                    except OSError:
-                        continue
-                    for f in files:
-                        base, ext = os.path.splitext(f)
-                        if ext in ICON_EXTS:
-                            cur = idx.get(base)
-                            if cur is None or score > cur[0]:
-                                idx[base] = (score, os.path.join(full, f))
-            self._index = idx
+            self._index = self._scan([(d, sc) for d, sc, _ in self.dirs])
         return self._index
+
+    def _scan(self, dirs):
+        idx = {}
+        for root in self.roots:
+            for d, score in dirs:
+                full = os.path.realpath(os.path.join(root, d))
+                try:
+                    files = os.listdir(full)
+                except OSError:
+                    continue
+                for f in files:
+                    base, ext = os.path.splitext(f)
+                    if ext in ICON_EXTS:
+                        cur = idx.get(base)
+                        if cur is None or score > cur[0]:
+                            idx[base] = (score, os.path.join(full, f))
+        return idx
 
 
 class IconResolver:

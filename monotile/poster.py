@@ -15,7 +15,7 @@ from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageStat
 
 from .iconfile import render
 
-ALGO_VERSION = 4
+ALGO_VERSION = 5
 WORK = 512
 STAT = 128
 
@@ -120,7 +120,7 @@ def _groups(keys):
     return out
 
 
-def poster(icon, colours=10, tones=2):
+def poster(icon, colours=10, tones=2, native=False, weight=1.0):
     """Return (RGBA artwork at WORK size with plate removed, plate_bbox or None, mode)."""
     alpha = _bin(icon.getchannel("A"))
     if not alpha.getbbox():
@@ -182,13 +182,18 @@ def poster(icon, colours=10, tones=2):
         art.paste(TONES[0], (0, 0), holes)
         mask = ImageChops.lighter(mask, holes)
     if tones in (2, 3):
-        art, mask = _two_tone(q, entries, background, mask, counts, total, grey_bodies=(tones == 3))
+        art, mask = _two_tone(q, entries, background, mask, counts, total,
+                              grey_bodies=(tones == 3), weight=weight)
+    if native and plate:                 # no tile to stand in for the plate: keep its outline
+        ring = ImageChops.subtract(alpha, _erode(alpha, max(2, round(WORK * 0.022 * weight))))
+        mask = ImageChops.lighter(mask, ring)
+        art.paste(TONES[0], (0, 0), ring)
     out = art.convert("RGBA")
     out.putalpha(mask)
     return out, (alpha.getbbox() if plate else None), ("plate" if plate else "logo")
 
 
-def _two_tone(q, entries, background, mask, counts, total, grey_bodies=False):
+def _two_tone(q, entries, background, mask, counts, total, grey_bodies=False, weight=1.0):
     """Everything white; where two genuinely different parts meet, cut a dark gap
     so they stay separate shapes (a stencil). Similar colours (gradient bands) are
     merged first so they do not produce false cuts.
@@ -236,7 +241,7 @@ def _two_tone(q, entries, background, mask, counts, total, grey_bodies=False):
     group = bytes((find(i) * 23 + 7) % 256 if i in parent else 0 for i in range(256))
     regions = Image.frombytes("L", q.size, q.tobytes().translate(group))
     edges = regions.filter(ImageFilter.FIND_EDGES).point(lambda v: 255 if v else 0)
-    gap = round(WORK * 0.008)
+    gap = max(1, round(WORK * 0.008 * min(weight, 2.0)))
     edges = edges.filter(ImageFilter.MaxFilter(gap * 2 + 1))
     inside = _erode(mask, gap + 2)                      # never nibble the outer silhouette
     mask = ImageChops.subtract(mask, ImageChops.multiply(edges, inside))
@@ -250,7 +255,7 @@ def _two_tone(q, entries, background, mask, counts, total, grey_bodies=False):
             continue
         small = _bin(body.resize((STAT, STAT), Image.BILINEAR))   # body -> outline only
         filled = _bin(ImageChops.lighter(small, _holes(small)).resize(q.size, Image.BILINEAR))
-        ring = ImageChops.subtract(filled, _erode(filled, round(WORK * 0.022)))
+        ring = ImageChops.subtract(filled, _erode(filled, round(WORK * 0.022 * weight)))
         mask = ImageChops.lighter(ImageChops.subtract(mask, body), ring)
     return art, mask
 
@@ -279,9 +284,30 @@ def compose(art, plate_box, size, shape="circle"):
     return out.resize((size, size), Image.LANCZOS)
 
 
+def compose_native(art, size):
+    """No tile: the icon keeps its own shape and position, drawn in the flat tones."""
+    if art is None:
+        return Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    return art.resize((size, size), Image.LANCZOS)
+
+
+SMALL = 32          # native icons at or below this size get heavier lines
+
+
 def convert(path, sizes=(256,), shape="circle", tones=2):
-    """Convert one icon file. Returns ({size: RGBA image}, mode)."""
-    if shape not in SHAPES or tones not in (2, 3, 4):
+    """Convert one icon file. Returns ({size: RGBA image}, mode).
+
+    shape: circle / squircle put the icon on a dark tile (apps, menu categories);
+    native keeps the icon's own silhouette (folders, file types, devices, status)."""
+    if shape not in SHAPES + ("native",) or tones not in (2, 3, 4):
         raise ValueError("unsupported shape or tones")
-    art, box, mode = poster(render(path, WORK), tones=tones)
-    return {s: compose(art, box, s, shape) for s in sizes}, mode
+    icon = render(path, WORK)
+    if shape != "native":
+        art, box, mode = poster(icon, tones=tones)
+        return {s: compose(art, box, s, shape) for s in sizes}, mode
+    out, mode = {}, "empty"
+    for group, weight in (([s for s in sizes if s <= SMALL], 2.6), ([s for s in sizes if s > SMALL], 1.0)):
+        if group:
+            art, _, mode = poster(icon, tones=tones, native=True, weight=weight)
+            out.update({s: compose_native(art, s) for s in group})
+    return out, mode

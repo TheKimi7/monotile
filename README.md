@@ -2,11 +2,11 @@
 
 **Nothing-inspired monochrome icons for every app on your Linux desktop.**
 
-monotile reads the icons of the apps you have installed and turns each one into a flat
-white icon on a dark circle or squircle, in the spirit of Nothing OS's monochrome
-icon packs. It writes the result as a normal icon theme, so your desktop shows it
-like any other theme, and it can keep that theme up to date as you install and
-remove apps.
+monotile turns your desktop's icons into flat white monochrome icons in the spirit of
+Nothing OS: app and menu icons on a dark circle or squircle, and folders, file types,
+devices and status icons as white line art in their own shape. It writes the result as
+a normal icon theme, so your desktop shows it like any other theme, and it can keep
+that theme up to date as you install and remove apps.
 
 ![30 common apps: original above, monotile below (circle)](docs/demo-circle.png)
 
@@ -14,6 +14,19 @@ remove apps.
 
 ![30 common apps: original above, monotile below (squircle)](docs/demo-squircle.png)
 </details>
+
+![Folders, file types and devices keep their own shape](docs/demo-system.png)
+
+### What gets converted
+
+| Icons | Style |
+|---|---|
+| Apps and application-menu categories | white stencil on a dark circle or squircle |
+| Folders and places, file types, devices, emblems | white stencil in the icon's own shape (no tile) |
+| Status icons that are coloured | white stencil in their own shape |
+| Status icons that are already monochrome, panel, tray and toolbar (symbolic) icons | left as they are |
+
+Papirus's extra folder colour variants (`folder-red-…`) are skipped; the default folders are converted.
 
 > Unofficial fan project. Not affiliated with or endorsed by Nothing Technology Limited.
 > No Nothing fonts, wallpapers or artwork are included.
@@ -109,7 +122,7 @@ You can also install it with `pipx install .` and run `monotile` instead of `./r
 | Command | What it does |
 |---|---|
 | `preview` | Renders a before/after contact sheet of your apps. Writes only the image. |
-| `generate` | Creates or updates `~/.local/share/icons/Monotile`. Only changed icons are reconverted; `--dry-run` reports without writing. |
+| `generate` | Creates or updates `~/.local/share/icons/Monotile`. Only changed icons are reconverted (in parallel; names that share one image are converted once and symlinked); `--dry-run` reports without writing. |
 | `apply` | Generates if needed, then sets the icon theme. Your previous theme is saved once. |
 | `revert` | Restores the icon theme you had before `apply`. |
 | `status` | Shows what is generated, active and watched. |
@@ -125,6 +138,8 @@ Style options work with `preview`, `generate` and `apply`, and are remembered:
 | `--source` | icon theme to read app icons from | Papirus if installed |
 | `--fallback` | icon theme for everything that is not an app icon (folders, file types…) | your icon theme at first run |
 | `--name` | name of the generated theme | `Monotile` |
+| `--contexts` (generate) | which kinds to convert: `apps,categories,places,mimetypes,devices,status,emblems` | all |
+| `--context` (preview) | which kind to show in the preview sheet | `apps` |
 
 Settings live in `~/.config/monotile/config.json`.
 
@@ -162,6 +177,8 @@ discovered. Reports from other desktops are very welcome.
   (common for Snap and AppImage) cannot be themed by any icon theme. `generate -v` lists them.
 - **KDE apps on other desktops** read their icon theme from `~/.config/kdeglobals`, not from
   GTK settings.
+- **First full run takes a few minutes** (about 2,000 unique images with Papirus; about 4 minutes
+  on a 12-thread laptop) and uses roughly 100 MB. Later runs only touch what changed.
 - **Imperfect conversions.** Icons whose symbol has the same colour as their background, or
   that are mostly a plain screen, can lose detail. Use an override.
 
@@ -193,7 +210,7 @@ installed .desktop files ──> lookup.py ──> icon file from the source the
 ## Development
 
 ```sh
-PYTHONPATH=. python3 -m unittest discover -s tests   # 33 tests, isolated temp XDG dirs
+PYTHONPATH=. python3 -m unittest discover -s tests   # isolated temp XDG dirs
 python3 docs/make_demo.py                            # rebuild the README images
 ```
 

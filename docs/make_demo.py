@@ -21,6 +21,14 @@ APPS = [
     "org.gnome.Maps", "org.gnome.clocks", "org.gnome.Calendar", "rhythmbox", "transmission", "org.gnome.Software",
 ]
 
+SYSTEM = [  # folders, file types, devices and status icons (drawn in their own shape)
+    "folder", "folder-documents", "folder-download", "folder-music", "folder-pictures", "folder-videos",
+    "user-home", "user-trash", "folder-git", "folder-github", "text-x-generic", "application-pdf",
+    "image-x-generic", "audio-x-generic", "video-x-generic", "application-x-archive", "text-x-python",
+    "application-json", "x-office-spreadsheet", "x-office-presentation", "drive-harddisk",
+    "drive-removable-media", "computer", "computer-laptop", "camera-photo", "audio-headphones",
+    "input-keyboard", "input-mouse", "phone", "printer"]
+
 resolver = IconResolver("Papirus")
 items = [(name, resolver.resolve(name)) for name in APPS]
 items = [(n, p) for n, p in items if p]
@@ -32,3 +40,10 @@ for shape in ("circle", "squircle"):
     out = os.path.join(HERE, f"demo-{shape}.png")
     sheet.save(out)
     print(f"{out}: {len(items)} apps, {failed} failed")
+
+sys_items = [(n, resolver.resolve(n)) for n in SYSTEM]
+sys_items = [(n, p) for n, p in sys_items if p]
+sheet, failed = contact_sheet(sys_items, lambda p, s: convert(p, (s,), "native", 2)[0][s], columns=10)
+out = os.path.join(HERE, "demo-system.png")
+sheet.save(out)
+print(f"{out}: {len(sys_items)} icons, {failed} failed")

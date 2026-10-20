@@ -13,6 +13,9 @@ DEFAULTS = {
     "shape": "circle",             # circle | squircle
     "tones": 2,                    # 2 | 3 | 4
     "sizes": [16, 22, 24, 32, 48, 64, 96, 128, 256],
+    # which kinds of icons to convert (apps and categories get the tile, the rest stay
+    # their own shape): apps categories places mimetypes devices status emblems
+    "contexts": ["apps", "categories", "places", "mimetypes", "devices", "status", "emblems"],
 }
 
 
@@ -83,6 +86,11 @@ def validate(cfg):
     if not (isinstance(sizes, list) and sizes and all(isinstance(s, int) and 8 <= s <= 512 for s in sizes)):
         raise ValueError("sizes: list of integers between 8 and 512")
     out["sizes"] = sorted(set(sizes))
+    known = DEFAULTS["contexts"]
+    ctxs = out["contexts"]
+    if not (isinstance(ctxs, list) and ctxs and all(c in known for c in ctxs)):
+        raise ValueError("contexts: a non-empty list from " + ", ".join(known))
+    out["contexts"] = [c for c in known if c in ctxs]
     return out
 
 
