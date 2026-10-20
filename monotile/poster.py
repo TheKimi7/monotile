@@ -9,12 +9,13 @@ from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageStat
 
 from .iconfile import render
 
-ALGO_VERSION = 3
+ALGO_VERSION = 4
 WORK = 512
 STAT = 128
 
 TILE = (30, 30, 30)
 TONES = [(242, 242, 242), (168, 168, 168), (100, 100, 100)]   # white, light, mid
+BODY_GREY = (120, 120, 120)                                      # 3-tone mix body fill
 SHAPES = ("circle", "squircle")
 
 
@@ -169,21 +170,22 @@ def poster(icon, colours=10, tones=4):
     if holes is not None:
         art.paste(TONES[0], (0, 0), holes)
         mask = ImageChops.lighter(mask, holes)
-    if tones == 2:
-        art, mask = _two_tone(q, entries, background, mask, counts, total)
+    if tones in (2, 3):
+        art, mask = _two_tone(q, entries, background, mask, counts, total, grey_bodies=(tones == 3))
     out = art.convert("RGBA")
     out.putalpha(mask)
     return out, (alpha.getbbox() if plate else None), ("plate" if plate else "logo")
 
 
-def _two_tone(q, entries, background, mask, counts, total):
+def _two_tone(q, entries, background, mask, counts, total, grey_bodies=False):
     """Everything white; where two genuinely different parts meet, cut a dark gap
     so they stay separate shapes (a stencil). Similar colours (gradient bands) are
     merged first so they do not produce false cuts.
 
     A large colourless body carrying other symbols (a grey drive under a wrench,
     a metal cabinet) would swallow those symbols as one white block, so it becomes
-    negative space with a thin white outline instead, and the symbols on it stay solid."""
+    negative space with a thin white outline instead, and the symbols on it stay solid.
+    With grey_bodies (the 3-tone mix) such a body is filled mid-grey instead."""
     # Major colours (>= 3% of the icon) are the real parts; tiny ones are edge
     # antialiasing and gradient steps. Tiny colours attach to their nearest major
     # so they can never chain two different parts together; majors only merge
@@ -228,14 +230,17 @@ def _two_tone(q, entries, background, mask, counts, total):
     inside = _erode(mask, gap + 2)                      # never nibble the outer silhouette
     mask = ImageChops.subtract(mask, ImageChops.multiply(edges, inside))
 
-    for root in bodies:                                 # body -> outline only
+    art = Image.new("RGB", q.size, TONES[0])
+    for root in bodies:
         sel = bytes(255 if (i in parent and find(i) == root) else 0 for i in range(256))
         body = Image.frombytes("L", q.size, q.tobytes().translate(sel))
-        small = _bin(body.resize((STAT, STAT), Image.BILINEAR))
+        if grey_bodies:                                 # body -> solid mid grey
+            art.paste(BODY_GREY, (0, 0), body)
+            continue
+        small = _bin(body.resize((STAT, STAT), Image.BILINEAR))   # body -> outline only
         filled = _bin(ImageChops.lighter(small, _holes(small)).resize(q.size, Image.BILINEAR))
         ring = ImageChops.subtract(filled, _erode(filled, round(WORK * 0.022)))
         mask = ImageChops.lighter(ImageChops.subtract(mask, body), ImageChops.multiply(ring, mask.point(lambda v: 255)))
-    art = Image.new("RGB", q.size, TONES[0])
     return art, mask
 
 
