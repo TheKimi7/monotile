@@ -37,32 +37,39 @@ def collect(source, include_hidden=False, exclude_theme=None):
     return items, skipped
 
 
+def make_tone(a):
+    from .tone import Tone
+    return Tone(darkness=a.darkness, contrast=a.contrast, separation=a.separation)
+
+
 def cmd_preview(a):
     from .preview import contact_sheet
     items, skipped = collect(a.source, a.all)
     if a.limit:
         items = items[: a.limit]
     t = time.time()
-    sheet, stats = contact_sheet([(lbl, p) for lbl, _, p in items], a.style, a.shape, a.columns)
+    sheet, failed = contact_sheet([(lbl, p) for lbl, _, p in items], make_tone(a), a.columns)
     out = os.path.abspath(a.output)
     sheet.save(out)
-    print(f"{len(items)} icons in {time.time() - t:.1f}s  "
-          f"(plate {stats['plate']}, logo {stats['logo']}, failed {stats['failed']})")
+    print(f"{len(items)} icons in {time.time() - t:.1f}s  (failed {failed})")
     for name, why in skipped:
         print(f"  skipped: {name} ({why})")
     print(f"preview: {out}")
 
 
 def main(argv=None):
-    p = argparse.ArgumentParser(prog="monotile", description="Monochrome tile icons for every installed app.")
+    p = argparse.ArgumentParser(prog="monotile", description="Dark black & white icon themes for every installed app.")
     p.add_argument("--version", action="version", version=__version__)
     sub = p.add_subparsers(dest="cmd", required=True)
 
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--source", default=default_source(),
                         help="icon theme to read app icons from (default: Papirus if installed)")
-    common.add_argument("--style", choices=("dark", "light"), default="dark")
-    common.add_argument("--shape", choices=("circle", "squircle", "none"), default="circle")
+    common.add_argument("--darkness", type=float, default=1.0,
+                        help="how far mid-tones are pushed towards black (0 = plain greyscale)")
+    common.add_argument("--contrast", type=float, default=1.15, help="contrast around mid-grey")
+    common.add_argument("--separation", type=float, default=1.0,
+                        help="how strongly different colours get different greys")
 
     pv = sub.add_parser("preview", parents=[common], help="render a before/after contact sheet")
     pv.add_argument("-o", "--output", default="monotile-preview.png")
