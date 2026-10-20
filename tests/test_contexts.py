@@ -191,3 +191,13 @@ class NativeNamesStayNative(FakeDesktop):
         for t in ("Monotile-Circle", "Monotile-Squircle"):
             self.assertFalse(os.path.exists(os.path.join(C.icons_dir(), t, "48x48", "apps", "folder.png")))
         self.assertTrue(os.path.exists(os.path.join(C.icons_dir(), "Monotile-Circle", "48x48", "places", "folder.png")))
+
+
+class DryRunWritesNothing(FakeDesktop):
+    def test_generate_dry_run_does_not_save_settings(self):
+        from monotile import cli
+        self.make_theme("Dr", dirs={"48x48/apps": (48, "Applications")})
+        self.add_icon("Dr", "48x48/apps", "calc")
+        self.add_app("calc", "calc")
+        cli.main(["generate", "--dry-run", "--source", "Dr", "--fallback", "Dr", "--shape", "squircle"])
+        self.assertFalse(os.path.exists(os.path.join(C.config_dir(), "config.json")))

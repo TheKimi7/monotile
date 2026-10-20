@@ -9,7 +9,7 @@ from . import config as C
 from . import desktop, theme, watch
 
 
-def resolve_fallback(cfg):
+def resolve_fallback(cfg, save=True):
     """The theme everything non-app is inherited from. Fixed at first run and saved,
     so the generated theme never ends up inheriting itself once it is active."""
     if cfg["fallback"]:
@@ -22,7 +22,8 @@ def resolve_fallback(cfg):
         fb = next((v for v in prev.values() if v and v not in own), None)
     fb = fb or ("Papirus-Dark" if theme.Theme("Papirus-Dark").exists else "Adwaita")
     cfg["fallback"] = fb
-    C.save(cfg)
+    if save:
+        C.save(cfg)
     return fb
 
 
@@ -101,8 +102,8 @@ def _adopt_legacy(cfg):
 def cmd_generate(a):
     if getattr(a, "contexts", None):
         a.contexts = [c.strip() for c in a.contexts.split(",") if c.strip()]
-    cfg = load_cfg(a, persist=True)
-    fallback = resolve_fallback(cfg)
+    cfg = load_cfg(a, persist=not a.dry_run)          # a dry run never writes settings
+    fallback = resolve_fallback(cfg, save=not a.dry_run)
     t = time.time()
     if not a.dry_run:
         _adopt_legacy(cfg)
