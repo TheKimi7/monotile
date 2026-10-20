@@ -79,7 +79,7 @@ def main(argv=None):
                         help="poster: four flat tones on a dark tile (default); grey: whole-icon greyscale")
     common.add_argument("--shape", choices=("circle", "squircle"), default="circle",
                         help="tile shape for the poster style")
-    common.add_argument("--tones", type=int, choices=(2, 3, 4), default=4,
+    common.add_argument("--tones", type=int, choices=(2, 3, 4), default=2,
                         help="poster style: 2 = white stencil (big grey bodies outlined), "
                              "3 = white stencil with big grey bodies filled grey, 4 = white/light/mid grey")
     common.add_argument("--darkness", type=float, default=1.0,

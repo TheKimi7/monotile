@@ -26,7 +26,11 @@ def _bin(mask, t=128):
 
 
 def _erode(mask, px):
-    return mask.filter(ImageFilter.MinFilter(px * 2 + 1)) if px > 0 else mask
+    """Square erosion of radius px. Repeated 3x3 min filters give exactly the same
+    result as one (2px+1)-wide filter at a fraction of the cost for large px."""
+    for _ in range(px):
+        mask = mask.filter(ImageFilter.MinFilter(3))
+    return mask
 
 
 def _area(mask):
