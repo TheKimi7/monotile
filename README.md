@@ -18,6 +18,32 @@ remove apps.
 > Unofficial fan project. Not affiliated with or endorsed by Nothing Technology Limited.
 > No Nothing fonts, wallpapers or artwork are included.
 
+## Desktop widgets (Cinnamon desklets)
+
+`desklets/` contains five matching desktop widgets as native Cinnamon desklets, so they
+behave like any other desklet: add or remove them with **right-click on the desktop >
+Add Desklets**, drag them anywhere, change them with **right-click > Configure**, and they
+stay visible when you show the desktop.
+
+| Desklet | Shows | Options |
+|---|---|---|
+| Mono Clock | 12-dot analog dial with a red second hand, or dot-matrix digital time | style, seconds, 24-hour |
+| Mono Date | weekday, dot-matrix day number, month | weekend accent, year |
+| Mono Weather | temperature, condition, place ([wttr.in](https://wttr.in), no API key) | location, °C/°F, update interval |
+| Mono System | concentric RAM and disk rings, number in the middle | RAM / CPU / disk, mount point, update interval |
+| Mono Day | 24 dots for the day, or 12 for the year | day / year |
+
+Every desklet also has a size, card opacity and accent colour setting.
+
+```sh
+./desklets/install.sh            # install; then add them from Add Desklets
+./desklets/install.sh --enable   # install and place all five on the desktop
+./desklets/install.sh --uninstall
+```
+
+The number font is Nothing's *Ndot 57* and the labels use *JetBrains Mono*; neither is
+bundled. Without them the desklets fall back to your default fonts.
+
 ## Why a generator?
 
 On Android, apps ship a separate monochrome layer and the launcher simply tints it.

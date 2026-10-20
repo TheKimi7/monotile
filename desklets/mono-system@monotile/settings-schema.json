@@ -1,0 +1,10 @@
+{
+    "head-look": { "type": "header", "description": "Look" },
+    "scale": { "type": "spinbutton", "default": 1.0, "min": 0.6, "max": 2.5, "step": 0.05, "units": "×", "description": "Size" },
+    "opacity": { "type": "scale", "default": 100, "min": 0, "max": 100, "step": 5, "description": "Card opacity (%)" },
+    "accent": { "type": "colorchooser", "default": "rgb(215,25,33)", "description": "Accent colour" },
+    "head-system": { "type": "header", "description": "System" },
+    "center": { "type": "combobox", "default": "ram", "options": { "RAM": "ram", "CPU": "cpu", "Disk": "disk" }, "description": "Number in the middle" },
+    "disk-path": { "type": "entry", "default": "/", "description": "Disk to measure (mount point)" },
+    "refresh": { "type": "spinbutton", "default": 3, "min": 1, "max": 60, "step": 1, "units": "s", "description": "Update every" }
+}

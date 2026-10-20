@@ -1,0 +1,10 @@
+{
+    "head-look": { "type": "header", "description": "Look" },
+    "scale": { "type": "spinbutton", "default": 1.0, "min": 0.6, "max": 2.5, "step": 0.05, "units": "×", "description": "Size" },
+    "opacity": { "type": "scale", "default": 100, "min": 0, "max": 100, "step": 5, "description": "Card opacity (%)" },
+    "accent": { "type": "colorchooser", "default": "rgb(215,25,33)", "description": "Accent colour" },
+    "head-weather": { "type": "header", "description": "Weather" },
+    "location": { "type": "entry", "default": "", "description": "Location (empty = detect automatically)", "tooltip": "A city name, e.g. Coimbatore or London" },
+    "units": { "type": "combobox", "default": "C", "options": { "Celsius": "C", "Fahrenheit": "F" }, "description": "Units" },
+    "refresh": { "type": "spinbutton", "default": 30, "min": 10, "max": 180, "step": 5, "units": "min", "description": "Update every" }
+}

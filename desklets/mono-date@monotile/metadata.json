@@ -1,0 +1,9 @@
+{
+  "uuid": "mono-date@monotile",
+  "name": "Mono Date",
+  "description": "Nothing-style date card: weekday, dot-matrix day number, month",
+  "icon": "x-office-calendar",
+  "prevent-decorations": true,
+  "max-instances": "10",
+  "version": "0.1.0"
+}

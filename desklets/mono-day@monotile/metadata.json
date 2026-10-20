@@ -1,0 +1,9 @@
+{
+  "uuid": "mono-day@monotile",
+  "name": "Mono Day",
+  "description": "Nothing-style progress bar: 24 dots for the day or 12 for the year",
+  "icon": "appointment-soon",
+  "prevent-decorations": true,
+  "max-instances": "10",
+  "version": "0.1.0"
+}

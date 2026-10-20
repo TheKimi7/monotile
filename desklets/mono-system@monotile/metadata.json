@@ -1,0 +1,9 @@
+{
+  "uuid": "mono-system@monotile",
+  "name": "Mono System",
+  "description": "Nothing-style system card: concentric RAM and disk rings",
+  "icon": "utilities-system-monitor",
+  "prevent-decorations": true,
+  "max-instances": "10",
+  "version": "0.1.0"
+}

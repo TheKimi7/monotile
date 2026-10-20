@@ -1,0 +1,9 @@
+{
+  "uuid": "mono-clock@monotile",
+  "name": "Mono Clock",
+  "description": "Nothing-style clock: 12-dot analog dial or dot-matrix digital",
+  "icon": "preferences-system-time",
+  "prevent-decorations": true,
+  "max-instances": "10",
+  "version": "0.1.0"
+}

@@ -1,0 +1,10 @@
+{
+    "head-look": { "type": "header", "description": "Look" },
+    "scale": { "type": "spinbutton", "default": 1.0, "min": 0.6, "max": 2.5, "step": 0.05, "units": "×", "description": "Size" },
+    "opacity": { "type": "scale", "default": 100, "min": 0, "max": 100, "step": 5, "description": "Card opacity (%)" },
+    "accent": { "type": "colorchooser", "default": "rgb(215,25,33)", "description": "Accent colour" },
+    "head-clock": { "type": "header", "description": "Clock" },
+    "style": { "type": "combobox", "default": "analog", "options": { "Analog (12-dot dial)": "analog", "Digital (dot-matrix)": "digital" }, "description": "Style" },
+    "seconds": { "type": "switch", "default": true, "description": "Show seconds (red hand / small digits)" },
+    "hour24": { "type": "switch", "default": true, "dependency": "style=digital", "description": "24-hour time" }
+}

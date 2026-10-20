@@ -1,0 +1,9 @@
+{
+  "uuid": "mono-weather@monotile",
+  "name": "Mono Weather",
+  "description": "Nothing-style weather card (data from wttr.in)",
+  "icon": "weather-few-clouds",
+  "prevent-decorations": true,
+  "max-instances": "10",
+  "version": "0.1.0"
+}
