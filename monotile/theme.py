@@ -90,6 +90,17 @@ def remove_all(cfg):
         remove(dict(cfg, name=name))
 
 
+def black_variant(places_index, name, path):
+    """Papirus ships every folder in a black colour variant (folder-black-music,
+    user-black-home...): use it for the "black" file style when there is one."""
+    m = re.match(r"^(folder|user)(-.*)?$", name)
+    if m:
+        alt = places_index.get(f"{m.group(1)}-black{m.group(2) or ''}")
+        if alt:
+            return alt[1]
+    return path
+
+
 def default_source(name):
     for t in ("Papirus", "Papirus-Dark"):
         if t != name and Theme(t).exists:
@@ -107,7 +118,7 @@ FILE_CONTEXTS = ("places", "mimetypes")
 def shape_for(cfg, ctx):
     if style_of(cfg, ctx) == "tile":
         return cfg["shape"]
-    if ctx in FILE_CONTEXTS and cfg.get("file_style", "grey") == "grey":
+    if ctx in FILE_CONTEXTS and cfg.get("file_style", "black") in ("grey", "black"):
         return "grey"
     return "native"
 
@@ -184,8 +195,11 @@ def plan(cfg):
     for ctx, fd_context, _ in CONTEXTS[2:]:
         if ctx not in contexts:
             continue
-        for name, (_, path) in sorted(src.index(fd_context).items()):
+        index = src.index(fd_context)
+        for name, (_, path) in sorted(index.items()):
             if _safe(name) and not (ctx == "places" and _COLOUR_VARIANT.match(name)):
+                if ctx == "places" and cfg.get("file_style", "black") == "black":
+                    path = black_variant(index, name, path)
                 add(ctx, name, path)
     return source, jobs, skipped
 

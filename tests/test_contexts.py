@@ -211,7 +211,7 @@ class GreyFiles(FakeDesktop):
         self.add_icon("Gr", "48x48/places", "folder")
         self.add_icon("Gr", "48x48/mimetypes", "text-plain")
         self.add_icon("Gr", "48x48/devices", "drive-harddisk")
-        cfg = C.validate({"source": "Gr", "fallback": "Gr", "sizes": [48]})
+        cfg = C.validate({"source": "Gr", "fallback": "Gr", "sizes": [48], "file_style": "grey"})
         theme.generate(cfg, "Gr", workers=1)
         base = os.path.join(C.icons_dir(), "Monotile", "48x48")
         for ctx, name in (("places", "folder"), ("mimetypes", "text-plain")):
@@ -223,3 +223,21 @@ class GreyFiles(FakeDesktop):
             self.assertTrue(60 < plate[0] < 200, plate)                              # plate kept as grey
         dev = Image.open(os.path.join(base, "devices", "drive-harddisk.png")).convert("RGBA")
         self.assertGreater(min(dev.getpixel((24, 24))[:3]), 200)                     # devices stay line art
+
+
+class BlackFolders(FakeDesktop):
+    def test_black_variant_used_when_present(self):
+        from PIL import Image
+        from helpers import plate_icon_png
+        self.make_theme("Bk", dirs={"48x48/places": (48, "Places")})
+        self.add_icon("Bk", "48x48/places", "folder-music")                       # blue
+        d = os.path.join(self.sys, "icons", "Bk", "48x48", "places")
+        plate_icon_png(os.path.join(d, "folder-black-music.png"), plate=(40, 40, 40), glyph=(200, 200, 200))
+        self.add_icon("Bk", "48x48/places", "folder-special")                     # no black variant
+        cfg = C.validate({"source": "Bk", "fallback": "Bk", "sizes": [48]})
+        theme.generate(cfg, "Bk", workers=1)
+        base = os.path.join(C.icons_dir(), "Monotile", "48x48", "places")
+        music = Image.open(os.path.join(base, "folder-music.png")).convert("RGB").getpixel((24, 6))
+        special = Image.open(os.path.join(base, "folder-special.png")).convert("RGB").getpixel((24, 6))
+        self.assertLess(music[0], 60)                    # the black variant
+        self.assertGreater(special[0], 60)               # greyscale fallback
