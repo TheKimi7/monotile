@@ -42,13 +42,23 @@ def make_tone(a):
     return Tone(darkness=a.darkness, contrast=a.contrast, separation=a.separation)
 
 
+def make_converter(a):
+    """path, size -> RGBA image, for the chosen style."""
+    if a.style == "grey":
+        from .iconfile import preview_pair
+        tone = make_tone(a)
+        return lambda path, size: preview_pair(path, tone, size)[1]
+    from . import poster
+    return lambda path, size: poster.convert(path, (size,), a.shape)[0][size]
+
+
 def cmd_preview(a):
     from .preview import contact_sheet
     items, skipped = collect(a.source, a.all)
     if a.limit:
         items = items[: a.limit]
     t = time.time()
-    sheet, failed = contact_sheet([(lbl, p) for lbl, _, p in items], make_tone(a), a.columns)
+    sheet, failed = contact_sheet([(lbl, p) for lbl, _, p in items], make_converter(a), a.columns)
     out = os.path.abspath(a.output)
     sheet.save(out)
     print(f"{len(items)} icons in {time.time() - t:.1f}s  (failed {failed})")
@@ -58,18 +68,22 @@ def cmd_preview(a):
 
 
 def main(argv=None):
-    p = argparse.ArgumentParser(prog="monotile", description="Dark black & white icon themes for every installed app.")
+    p = argparse.ArgumentParser(prog="monotile", description="Nothing-style monochrome icon themes for every installed app.")
     p.add_argument("--version", action="version", version=__version__)
     sub = p.add_subparsers(dest="cmd", required=True)
 
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--source", default=default_source(),
                         help="icon theme to read app icons from (default: Papirus if installed)")
+    common.add_argument("--style", choices=("poster", "grey"), default="poster",
+                        help="poster: four flat tones on a dark tile (default); grey: whole-icon greyscale")
+    common.add_argument("--shape", choices=("circle", "squircle"), default="circle",
+                        help="tile shape for the poster style")
     common.add_argument("--darkness", type=float, default=1.0,
-                        help="how far mid-tones are pushed towards black (0 = plain greyscale)")
-    common.add_argument("--contrast", type=float, default=1.15, help="contrast around mid-grey")
+                        help="grey style: how far mid-tones are pushed towards black")
+    common.add_argument("--contrast", type=float, default=1.15, help="grey style: contrast around mid-grey")
     common.add_argument("--separation", type=float, default=1.0,
-                        help="how strongly different colours get different greys")
+                        help="grey style: how strongly different colours get different greys")
 
     pv = sub.add_parser("preview", parents=[common], help="render a before/after contact sheet")
     pv.add_argument("-o", "--output", default="monotile-preview.png")

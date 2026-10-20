@@ -1,7 +1,7 @@
 """Contact sheet: original icon above, converted icon below, app name under both."""
 from PIL import Image, ImageDraw, ImageFont
 
-from .iconfile import preview_pair
+from .iconfile import render
 
 CELL_W, ICON, PAD = 132, 64, 14
 
@@ -15,8 +15,9 @@ def _font(size):
     return ImageFont.load_default()
 
 
-def contact_sheet(items, tone, columns=10, bg=(0, 0, 0)):
-    """items: list of (label, icon_path). Returns (sheet image, failed count)."""
+def contact_sheet(items, convert_one, columns=10, bg=(0, 0, 0)):
+    """items: list of (label, icon_path); convert_one(path, size) -> RGBA image.
+    Returns (sheet image, failed count)."""
     rows = (len(items) + columns - 1) // columns
     cell_h = PAD + ICON + 8 + ICON + 6 + 26
     sheet = Image.new("RGB", (columns * CELL_W, max(1, rows) * cell_h), bg)
@@ -27,7 +28,7 @@ def contact_sheet(items, tone, columns=10, bg=(0, 0, 0)):
         x = (i % columns) * CELL_W + (CELL_W - ICON) // 2
         y = (i // columns) * cell_h + PAD
         try:
-            orig, conv = preview_pair(path, tone, ICON)
+            orig, conv = render(path, ICON), convert_one(path, ICON)
             sheet.paste(orig, (x, y), orig)
             sheet.paste(conv, (x, y + ICON + 8), conv)
         except Exception:
