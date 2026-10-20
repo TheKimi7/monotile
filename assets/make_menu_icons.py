@@ -29,7 +29,17 @@ def svg(dots, centre_r):
             f'{body}<circle cx="32" cy="32" r="{centre_r}" fill="{RED}"/></svg>\n')
 
 
+def disc(gap):
+    """Solid white disc with a red centre dot; `gap` adds a dark ring around the dot."""
+    ring = f'<circle cx="32" cy="32" r="11" fill="#000000"/>' if gap else ""
+    return ('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">'
+            f'<circle cx="32" cy="32" r="28" fill="{WHITE}"/>{ring}'
+            f'<circle cx="32" cy="32" r="{7.5 if gap else 8.5}" fill="{RED}"/></svg>\n')
+
+
 VARIANTS = {
+    "monotile-menu-disc": disc(False),
+    "monotile-menu-disc-gap": disc(True),
     "monotile-menu-hex6": svg([(x, y, 4.6) for x, y in hexagon_ring(22, 1)], 6.0),
     "monotile-menu-hex12": svg([(x, y, 3.6) for x, y in hexagon_ring(25, 2)], 5.6),
     "monotile-menu-hex19": svg([(x, y, 3.4) for x, y in hexagon_ring(13, 1)] +
