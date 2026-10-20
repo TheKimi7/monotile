@@ -9,7 +9,7 @@ from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageStat
 
 from .iconfile import render
 
-ALGO_VERSION = 1
+ALGO_VERSION = 3
 WORK = 512
 STAT = 128
 
@@ -170,16 +170,26 @@ def poster(icon, colours=10, tones=4):
         art.paste(TONES[0], (0, 0), holes)
         mask = ImageChops.lighter(mask, holes)
     if tones == 2:
-        art, mask = _two_tone(q, entries, background, mask)
+        art, mask = _two_tone(q, entries, background, mask, counts, total)
     out = art.convert("RGBA")
     out.putalpha(mask)
     return out, (alpha.getbbox() if plate else None), ("plate" if plate else "logo")
 
 
-def _two_tone(q, entries, background, mask):
+def _two_tone(q, entries, background, mask, counts, total):
     """Everything white; where two genuinely different parts meet, cut a dark gap
     so they stay separate shapes (a stencil). Similar colours (gradient bands) are
-    merged first so they do not produce false cuts."""
+    merged first so they do not produce false cuts.
+
+    A large colourless body carrying other symbols (a grey drive under a wrench,
+    a metal cabinet) would swallow those symbols as one white block, so it becomes
+    negative space with a thin white outline instead, and the symbols on it stay solid."""
+    # Major colours (>= 3% of the icon) are the real parts; tiny ones are edge
+    # antialiasing and gradient steps. Tiny colours attach to their nearest major
+    # so they can never chain two different parts together; majors only merge
+    # with each other when they are bands of the same gradient.
+    fg = [(i, c) for i, c in entries if i not in background]
+    majors = [(i, c) for i, c in fg if counts.get(i, 0) >= 0.03 * total] or fg
     parent = {i: i for i, _ in entries}
 
     def find(i):
@@ -187,19 +197,46 @@ def _two_tone(q, entries, background, mask):
             parent[i] = parent[parent[i]]
             i = parent[i]
         return i
-    for a_i, a_c in entries:
-        for b_i, b_c in entries:
-            if a_i < b_i and _dist(a_c, b_c) < 40:
+    for a_i, a_c in majors:
+        for b_i, b_c in majors:
+            if a_i < b_i and _dist(a_c, b_c) < 36:
                 parent[find(a_i)] = find(b_i)
+    major_ids = {i for i, _ in majors}
+    for i, c in fg:
+        if i not in major_ids:
+            parent[i] = find(min(majors, key=lambda m: _dist(m[1], c))[0])
+
+    colour = dict(entries)
+    groups = {}
+    for i, _ in entries:
+        if i not in background:
+            groups.setdefault(find(i), []).append(i)
+    fg_area = sum(counts.get(i, 0) for m in groups.values() for i in m)
+    bodies = []
+    for root, members in groups.items():
+        area = sum(counts.get(i, 0) for i in members)
+        avg = [sum(colour[i][k] * counts.get(i, 0) for i in members) / float(area or 1) for k in range(3)]
+        neutral = max(avg) - min(avg) < 40
+        if neutral and area > 0.40 * total and fg_area - area > 0.03 * total:
+            bodies.append(root)
+
     group = bytes((find(i) * 23 + 7) % 256 if i in parent else 0 for i in range(256))
     regions = Image.frombytes("L", q.size, q.tobytes().translate(group))
     edges = regions.filter(ImageFilter.FIND_EDGES).point(lambda v: 255 if v else 0)
     gap = round(WORK * 0.008)
     edges = edges.filter(ImageFilter.MaxFilter(gap * 2 + 1))
     inside = _erode(mask, gap + 2)                      # never nibble the outer silhouette
-    cuts = ImageChops.multiply(edges, inside)
+    mask = ImageChops.subtract(mask, ImageChops.multiply(edges, inside))
+
+    for root in bodies:                                 # body -> outline only
+        sel = bytes(255 if (i in parent and find(i) == root) else 0 for i in range(256))
+        body = Image.frombytes("L", q.size, q.tobytes().translate(sel))
+        small = _bin(body.resize((STAT, STAT), Image.BILINEAR))
+        filled = _bin(ImageChops.lighter(small, _holes(small)).resize(q.size, Image.BILINEAR))
+        ring = ImageChops.subtract(filled, _erode(filled, round(WORK * 0.022)))
+        mask = ImageChops.lighter(ImageChops.subtract(mask, body), ImageChops.multiply(ring, mask.point(lambda v: 255)))
     art = Image.new("RGB", q.size, TONES[0])
-    return art, ImageChops.subtract(mask, cuts)
+    return art, mask
 
 
 # ------------------------------------------------------------------ compose
