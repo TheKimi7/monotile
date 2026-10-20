@@ -1,9 +1,15 @@
-"""Four-tone monochrome icons on a dark tile.
+"""Turn a coloured app icon into a flat monochrome icon on a dark tile.
 
-Each icon is reduced to its flat colour regions. The background plate becomes the
-tile; every other region gets one of three flat tones (white, light grey, mid grey)
-ranked by how strongly it stands out from that background, so the most prominent
-symbol ends up white and nothing gets dropped.
+1. The icon is reduced to its flat colour regions (gradients and antialiasing merge).
+2. A plain background plate (circle, squircle, rectangle) is detected and becomes the tile.
+3. Every other region is drawn in flat tones:
+   tones=2 (default)  white stencil: parts separated by thin dark cuts; a large grey
+                      body carrying other symbols becomes an outline so they stay visible
+   tones=3            as 2, but such bodies are filled mid-grey instead of outlined
+   tones=4            white / light grey / mid grey ranked by contrast with the background
+4. The result is centred on a circle or squircle tile and rendered at each size.
+
+Pure Pillow; deterministic (same input and settings give byte-identical output).
 """
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageStat
 
@@ -114,7 +120,7 @@ def _groups(keys):
     return out
 
 
-def poster(icon, colours=10, tones=4):
+def poster(icon, colours=10, tones=2):
     """Return (RGBA artwork at WORK size with plate removed, plate_bbox or None, mode)."""
     alpha = _bin(icon.getchannel("A"))
     if not alpha.getbbox():
@@ -152,10 +158,11 @@ def poster(icon, colours=10, tones=4):
         for k in grp:
             tone_of[keyed[k][0]] = TONES[min(t, 2)]
     # tiny clusters and anything unassigned follow their nearest assigned neighbour
+    colour = dict(entries)
     for i, c in entries:
         if i in background or i in tone_of:
             continue
-        near = min(tone_of, key=lambda j: _dist(dict(entries)[j], c)) if tone_of else None
+        near = min(tone_of, key=lambda j: _dist(colour[j], c)) if tone_of else None
         tone_of[i] = tone_of[near] if near is not None else TONES[0]
 
     lut = []
@@ -244,7 +251,7 @@ def _two_tone(q, entries, background, mask, counts, total, grey_bodies=False):
         small = _bin(body.resize((STAT, STAT), Image.BILINEAR))   # body -> outline only
         filled = _bin(ImageChops.lighter(small, _holes(small)).resize(q.size, Image.BILINEAR))
         ring = ImageChops.subtract(filled, _erode(filled, round(WORK * 0.022)))
-        mask = ImageChops.lighter(ImageChops.subtract(mask, body), ImageChops.multiply(ring, mask.point(lambda v: 255)))
+        mask = ImageChops.lighter(ImageChops.subtract(mask, body), ring)
     return art, mask
 
 
@@ -256,7 +263,7 @@ def compose(art, plate_box, size, shape="circle"):
     tile = tile_mask(S, shape)
     out = Image.new("RGBA", (S, S), (0, 0, 0, 0))
     out.paste(Image.new("RGBA", (S, S), TILE + (255,)), (0, 0), tile)
-    if art is not None:
+    if art is not None and art.getbbox():
         if plate_box:                       # plate fills the tile; keep glyph proportions
             crop = art.crop(plate_box)
             target = S * (0.80 if shape == "circle" else 0.88)
@@ -272,6 +279,9 @@ def compose(art, plate_box, size, shape="circle"):
     return out.resize((size, size), Image.LANCZOS)
 
 
-def convert(path, sizes=(256,), shape="circle", tones=4):
+def convert(path, sizes=(256,), shape="circle", tones=2):
+    """Convert one icon file. Returns ({size: RGBA image}, mode)."""
+    if shape not in SHAPES or tones not in (2, 3, 4):
+        raise ValueError("unsupported shape or tones")
     art, box, mode = poster(render(path, WORK), tones=tones)
     return {s: compose(art, box, s, shape) for s in sizes}, mode
