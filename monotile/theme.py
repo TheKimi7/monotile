@@ -40,7 +40,14 @@ CONTEXTS = [
     ("devices", "Devices", "native"),
     ("status", "Status", "native"),
     ("emblems", "Emblems", "native"),
+    ("actions", "Actions", "native"),
 ]
+# kinds where icons that are already monochrome (tray symbols, toolbar buttons) are
+# left alone and inherited, and only coloured ones are converted
+KEEP_MONO = ("status", "actions")
+# session and system icons the shell shows outside any app entry (menu power, lock and
+# log-out buttons, settings): converted like apps even though no .desktop file uses them
+SYSTEM_APP_ICON = re.compile(r"^system-")
 CONTEXT_NAMES = [c for c, _, _ in CONTEXTS]
 
 # Papirus ships every folder in ~25 colours; only the default set is ever used
@@ -119,6 +126,10 @@ def plan(cfg):
             jobs.setdefault(("apps", name), ("override", overrides[name]))
 
     src = Theme(source)
+    if "apps" in contexts:
+        for name, (_, path) in sorted(src.index("Applications").items()):
+            if SYSTEM_APP_ICON.match(name) and _safe(name) and ("apps", name) not in jobs:
+                add("apps", name, path)
     if "categories" in contexts:
         for name in sorted(menu_category_icons()):
             add("categories", name, resolver.resolve(name))
@@ -179,8 +190,14 @@ def _link(target, link):
 
 
 def write_index(cfg, tdir, fallback, used_contexts):
+    """Every size folder is Scalable over the range above the next smaller size, and the
+    largest one up to 512 px, so a request for any size picks the nearest larger image
+    and the toolkit scales it (Fixed folders made 150-400 px requests snap to 256)."""
+    sizes = sorted(cfg["sizes"])
+    ranges = {s: (8 if i == 0 else sizes[i - 1] + 1, 512 if i == len(sizes) - 1 else s)
+              for i, s in enumerate(sizes)}
     dirs = []
-    for s in cfg["sizes"]:
+    for s in sizes:
         for ctx, fd_context, _ in CONTEXTS:
             if ctx in used_contexts:
                 dirs.append((f"{s}x{s}/{ctx}", s, fd_context))
@@ -189,7 +206,9 @@ def write_index(cfg, tdir, fallback, used_contexts):
              f"Inherits={fallback},hicolor" if fallback != "hicolor" else "Inherits=hicolor",
              "Directories=" + ",".join(d for d, _, _ in dirs), ""]
     for d, s, fd_context in dirs:
-        lines += [f"[{d}]", f"Size={s}", f"Context={fd_context}", "Type=Threshold", "Threshold=2", ""]
+        lo, hi = ranges[s]
+        lines += [f"[{d}]", f"Size={s}", f"Context={fd_context}", "Type=Scalable",
+                  f"MinSize={lo}", f"MaxSize={hi}", ""]
     C.atomic_write(os.path.join(tdir, "index.theme"), "\n".join(lines))
 
 
@@ -249,7 +268,7 @@ def _generate(cfg, fallback, tdir, dry_run, workers):
         shape = shape_for(cfg, ctx)
         try:
             # status icons also depend on the "keep already-monochrome icons" rule
-            key = _key(kind, path, settings_hash(cfg, shape + ("+keep-mono" if ctx == "status" else "")))
+            key = _key(kind, path, settings_hash(cfg, shape + ("+keep-mono" if ctx in KEEP_MONO else "")))
         except OSError as e:
             stats["failed"].append((f"{ctx}/{name}", str(e)))
             continue
@@ -261,7 +280,7 @@ def _generate(cfg, fallback, tdir, dry_run, workers):
             stats["unchanged"] += 1
             continue
         todo[mkey] = (ctx, name, kind, key, old)
-        groups.setdefault((key["src"], kind, shape, ctx == "status"), []).append(mkey)
+        groups.setdefault((key["src"], kind, shape, ctx in KEEP_MONO), []).append(mkey)
 
     if dry_run:
         for mkeys in groups.values():

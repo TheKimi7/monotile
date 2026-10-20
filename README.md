@@ -21,10 +21,13 @@ that theme up to date as you install and remove apps.
 
 | Icons | Style |
 |---|---|
-| Apps and application-menu categories | white stencil on a dark circle or squircle |
+| Apps, application-menu categories, session icons (shut down, lock, log out, suspend…) | white stencil on a dark circle or squircle |
 | Folders and places, file types, devices, emblems | white stencil in the icon's own shape (no tile) |
-| Status icons that are coloured | white stencil in their own shape |
-| Status icons that are already monochrome, panel, tray and toolbar (symbolic) icons | left as they are |
+| Status and action icons that are coloured | white stencil in their own shape |
+| Status and action icons that are already monochrome, panel, tray and toolbar (symbolic) icons | left as they are |
+
+Every size folder is declared scalable over a range, so icons follow any size you pick
+(file manager zoom, desktop icon size, panel size) instead of snapping to fixed sizes.
 
 Papirus's extra folder colour variants (`folder-red-…`) are skipped; the default folders are converted.
 
@@ -138,7 +141,7 @@ Style options work with `preview`, `generate` and `apply`, and are remembered:
 | `--source` | icon theme to read app icons from | Papirus if installed |
 | `--fallback` | icon theme for everything that is not an app icon (folders, file types…) | your icon theme at first run |
 | `--name` | name of the generated theme | `Monotile` |
-| `--contexts` (generate) | which kinds to convert: `apps,categories,places,mimetypes,devices,status,emblems` | all |
+| `--contexts` (generate) | which kinds to convert: `apps,categories,places,mimetypes,devices,status,emblems,actions` | all |
 | `--context` (preview) | which kind to show in the preview sheet | `apps` |
 
 Settings live in `~/.config/monotile/config.json`.

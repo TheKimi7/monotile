@@ -79,3 +79,42 @@ class AllIcons(FakeDesktop):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ScalingAndSystemIcons(FakeDesktop):
+    def setUp(self):
+        super().setUp()
+        self.make_theme("Sys", dirs={"48x48/apps": (48, "Applications"), "24x24/actions": (24, "Actions")})
+        self.add_icon("Sys", "48x48/apps", "system-shutdown")
+        self.add_icon("Sys", "48x48/apps", "random-unused-app")
+        self.add_icon("Sys", "24x24/actions", "edit-delete")                 # coloured
+        self.add_icon("Sys", "24x24/actions", "go-next", mono=True)          # already mono
+        self.cfg = C.validate({"source": "Sys", "fallback": "Sys", "sizes": [16, 48, 256]})
+        self.tdir = C.theme_dir(self.cfg)
+
+    def test_system_icons_converted_without_an_app(self):
+        theme.generate(self.cfg, "Sys", workers=1)
+        apps = os.path.join(self.tdir, "48x48", "apps")
+        self.assertTrue(os.path.exists(os.path.join(apps, "system-shutdown.png")))
+        self.assertFalse(os.path.exists(os.path.join(apps, "random-unused-app.png")))
+
+    def test_actions_keep_monochrome(self):
+        s = theme.generate(self.cfg, "Sys", workers=1)
+        acts = os.path.join(self.tdir, "48x48", "actions")
+        self.assertTrue(os.path.exists(os.path.join(acts, "edit-delete.png")))
+        self.assertFalse(os.path.exists(os.path.join(acts, "go-next.png")))
+        self.assertEqual(s["kept"], 1)
+
+    def test_index_sizes_are_scalable_ranges(self):
+        theme.generate(self.cfg, "Sys", workers=1)
+        import configparser
+        cp = configparser.RawConfigParser()
+        cp.read(os.path.join(self.tdir, "index.theme"))
+        got = {d: (cp[d]["Type"], int(cp[d]["MinSize"]), int(cp[d]["MaxSize"]))
+               for d in ("16x16/apps", "48x48/apps", "256x256/apps")}
+        self.assertEqual(got, {"16x16/apps": ("Scalable", 8, 16), "48x48/apps": ("Scalable", 17, 48),
+                               "256x256/apps": ("Scalable", 49, 512)})
+
+    def test_old_saved_context_list_means_everything(self):
+        cfg = C.validate({"contexts": ["apps", "categories", "places", "mimetypes", "devices", "status", "emblems"]})
+        self.assertIn("actions", cfg["contexts"])

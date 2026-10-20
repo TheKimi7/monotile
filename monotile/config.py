@@ -15,8 +15,10 @@ DEFAULTS = {
     "sizes": [16, 22, 24, 32, 48, 64, 96, 128, 256],
     # which kinds of icons to convert (apps and categories get the tile, the rest stay
     # their own shape): apps categories places mimetypes devices status emblems
-    "contexts": ["apps", "categories", "places", "mimetypes", "devices", "status", "emblems"],
+    "contexts": ["apps", "categories", "places", "mimetypes", "devices", "status", "emblems", "actions"],
 }
+# the full list before "actions" existed: a config saved with it means "everything"
+_OLD_ALL_CONTEXTS = {"apps", "categories", "places", "mimetypes", "devices", "status", "emblems"}
 
 
 def _xdg(var, default):
@@ -88,6 +90,8 @@ def validate(cfg):
     out["sizes"] = sorted(set(sizes))
     known = DEFAULTS["contexts"]
     ctxs = out["contexts"]
+    if isinstance(ctxs, list) and set(ctxs) == _OLD_ALL_CONTEXTS:
+        ctxs = list(known)
     if not (isinstance(ctxs, list) and ctxs and all(c in known for c in ctxs)):
         raise ValueError("contexts: a non-empty list from " + ", ".join(known))
     out["contexts"] = [c for c in known if c in ctxs]
