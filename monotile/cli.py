@@ -29,7 +29,7 @@ def resolve_fallback(cfg, save=True):
 
 def load_cfg(a, persist=False):
     cfg = C.load()
-    for k in ("name", "source", "fallback", "shape", "tones", "contexts"):
+    for k in ("name", "source", "fallback", "shape", "tones", "contexts", "file_style"):
         v = getattr(a, k, None)
         if v is not None:
             cfg[k] = v
@@ -198,6 +198,9 @@ def build_parser():
                        help="which of the two themes `apply` activates (both are always generated)")
     style.add_argument("--tones", type=int, choices=(2, 3, 4),
                        help="2 = white stencil (default), 3 = grey bodies, 4 = white/light/mid grey")
+    style.add_argument("--file-style", dest="file_style", choices=("grey", "native"),
+                       help="folders and file types: grey = the source icons without colour (default), "
+                            "native = white line art")
     style.add_argument("--source", help="icon theme to read app icons from (default: Papirus if installed)")
     style.add_argument("--fallback", help="icon theme to inherit non-app icons from (default: your current theme)")
     style.add_argument("--name", help="name of the generated theme (default: Monotile)")

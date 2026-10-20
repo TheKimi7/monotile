@@ -101,8 +101,15 @@ def style_of(cfg, ctx):
     return next(st for c, _, st in CONTEXTS if c == ctx) if ctx else None
 
 
+FILE_CONTEXTS = ("places", "mimetypes")
+
+
 def shape_for(cfg, ctx):
-    return cfg["shape"] if style_of(cfg, ctx) == "tile" else "native"
+    if style_of(cfg, ctx) == "tile":
+        return cfg["shape"]
+    if ctx in FILE_CONTEXTS and cfg.get("file_style", "grey") == "grey":
+        return "grey"
+    return "native"
 
 
 def settings_hash(cfg, shape):

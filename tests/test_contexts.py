@@ -64,7 +64,7 @@ class AllIcons(FakeDesktop):
 
     def test_native_icons_have_no_tile(self):
         from PIL import Image
-        theme.generate(self.cfg, "Full", workers=1)
+        theme.generate(dict(self.cfg, file_style="native"), "Full", workers=1)
         corner = Image.open(self.out("places", "folder")).convert("RGBA").getpixel((24, 24))
         tile = Image.open(self.out("apps", "calc")).convert("RGBA").getpixel((24, 6))
         self.assertGreater(min(corner[:3]), 200)        # centre of the native icon is white glyph
@@ -201,3 +201,25 @@ class DryRunWritesNothing(FakeDesktop):
         self.add_app("calc", "calc")
         cli.main(["generate", "--dry-run", "--source", "Dr", "--fallback", "Dr", "--shape", "squircle"])
         self.assertFalse(os.path.exists(os.path.join(C.config_dir(), "config.json")))
+
+
+class GreyFiles(FakeDesktop):
+    def test_folders_and_files_are_greyscale_copies(self):
+        from PIL import Image
+        self.make_theme("Gr", dirs={"48x48/places": (48, "Places"), "48x48/mimetypes": (48, "MimeTypes"),
+                                    "48x48/devices": (48, "Devices")})
+        self.add_icon("Gr", "48x48/places", "folder")
+        self.add_icon("Gr", "48x48/mimetypes", "text-plain")
+        self.add_icon("Gr", "48x48/devices", "drive-harddisk")
+        cfg = C.validate({"source": "Gr", "fallback": "Gr", "sizes": [48]})
+        theme.generate(cfg, "Gr", workers=1)
+        base = os.path.join(C.icons_dir(), "Monotile", "48x48")
+        for ctx, name in (("places", "folder"), ("mimetypes", "text-plain")):
+            im = Image.open(os.path.join(base, ctx, name + ".png")).convert("RGBA")
+            px = [p for p in im.getdata() if p[3] > 0]
+            self.assertTrue(px)
+            self.assertTrue(all(r == g == b for r, g, b, _ in px), (ctx, name))      # no colour left
+            plate = im.getpixel((24, 8))
+            self.assertTrue(60 < plate[0] < 200, plate)                              # plate kept as grey
+        dev = Image.open(os.path.join(base, "devices", "drive-harddisk.png")).convert("RGBA")
+        self.assertGreater(min(dev.getpixel((24, 24))[:3]), 200)                     # devices stay line art

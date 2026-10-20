@@ -294,13 +294,23 @@ def compose_native(art, size):
 SMALL = 32          # native icons at or below this size get heavier lines
 
 
+def greyscale(icon):
+    """The icon exactly as drawn, without colour (perceptual luminance, alpha kept)."""
+    grey = icon.convert("L").convert("RGBA")
+    grey.putalpha(icon.getchannel("A"))
+    return grey
+
+
 def convert(path, sizes=(256,), shape="circle", tones=2):
     """Convert one icon file. Returns ({size: RGBA image}, mode).
 
     shape: circle / squircle put the icon on a dark tile (apps, menu categories);
-    native keeps the icon's own silhouette (folders, file types, devices, status)."""
-    if shape not in SHAPES + ("native",) or tones not in (2, 3, 4):
+    native keeps the icon's own silhouette as white line art (devices, status, ...);
+    grey keeps the icon exactly as drawn, only without colour (folders, file types)."""
+    if shape not in SHAPES + ("native", "grey") or tones not in (2, 3, 4):
         raise ValueError("unsupported shape or tones")
+    if shape == "grey":                    # rendered at each size, so small sizes stay crisp
+        return {s: greyscale(render(path, s)) for s in sizes}, "grey"
     icon = render(path, WORK)
     if shape != "native":
         art, box, mode = poster(icon, tones=tones)

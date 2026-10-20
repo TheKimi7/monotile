@@ -22,7 +22,8 @@ that theme up to date as you install and remove apps.
 | Icons | Style |
 |---|---|
 | Apps, application-menu categories, session icons (shut down, lock, log out, suspend…) | white stencil on a dark circle or squircle |
-| Folders and places, file types, devices, emblems | white stencil in the icon's own shape (no tile) |
+| Folders and file types | the source icons exactly as drawn, in greyscale (`--file-style native` for white line art instead) |
+| Devices and emblems | white stencil in the icon's own shape (no tile) |
 | Status and action icons that are coloured | white stencil in their own shape |
 | Status and action icons that are already monochrome, panel, tray and toolbar (symbolic) icons | left as they are |
 
@@ -154,6 +155,7 @@ Style options work with `preview`, `generate` and `apply`, and are remembered:
 | Option | Values | Default |
 |---|---|---|
 | `--shape` | which theme `apply` activates: `circle`, `squircle` | `circle` |
+| `--file-style` | folders and file types: `grey` (source icons without colour) or `native` (white line art) | `grey` |
 | `--tones` | `2` white stencil · `3` large grey bodies filled grey · `4` white / light grey / mid grey | `2` |
 | `--source` | icon theme to read app icons from | Papirus if installed |
 | `--fallback` | icon theme for everything that is not an app icon (folders, file types…) | your icon theme at first run |

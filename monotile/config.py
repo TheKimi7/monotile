@@ -12,6 +12,7 @@ DEFAULTS = {
     "fallback": None,              # theme to inherit everything else from; None = current theme at first run
     "shape": "circle",             # circle | squircle
     "tones": 2,                    # 2 | 3 | 4
+    "file_style": "grey",          # folders and file types: grey (source icon without colour) | native (line art)
     "sizes": [16, 22, 24, 32, 48, 64, 96, 128, 256],
     # which kinds of icons to convert (apps and categories get the tile, the rest stay
     # their own shape): apps categories places mimetypes devices status emblems
@@ -85,6 +86,8 @@ def validate(cfg):
         raise ValueError("shape: circle or squircle")
     if out["tones"] not in (2, 3, 4):
         raise ValueError("tones: 2, 3 or 4")
+    if out["file_style"] not in ("grey", "native"):
+        raise ValueError("file_style: grey or native")
     sizes = out["sizes"]
     if not (isinstance(sizes, list) and sizes and all(isinstance(s, int) and 8 <= s <= 512 for s in sizes)):
         raise ValueError("sizes: list of integers between 8 and 512")
