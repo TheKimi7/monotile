@@ -14,11 +14,12 @@ def resolve_fallback(cfg):
     so the generated theme never ends up inheriting itself once it is active."""
     if cfg["fallback"]:
         return cfg["fallback"]
+    own = set(theme.variant_names(cfg)) | {cfg["name"]}
     cur = desktop.current_theme()
-    fb = cur if cur and cur != cfg["name"] else None
+    fb = cur if cur and cur not in own else None
     if not fb:
         prev = C.load_state().get("previous", {})
-        fb = next((v for v in prev.values() if v and v != cfg["name"]), None)
+        fb = next((v for v in prev.values() if v and v not in own), None)
     fb = fb or ("Papirus-Dark" if theme.Theme("Papirus-Dark").exists else "Adwaita")
     cfg["fallback"] = fb
     C.save(cfg)
@@ -61,39 +62,78 @@ def cmd_preview(a):
     print(f"{len(items)} icons in {time.time() - t:.1f}s (failed {failed}) -> {out}")
 
 
+def _report(stats, name, a, elapsed):
+    verb = "would convert" if a.dry_run else "converted"
+    print(f"{name}: {verb} {stats['converted']}, aliases {stats['linked']}, already mono {stats['kept']}, "
+          f"overrides {stats['overrides']}, unchanged {stats['unchanged']}, removed {stats['removed']}, "
+          f"failed {len(stats['failed'])} in {elapsed:.1f}s")
+    print(f"  contexts: {', '.join(stats['contexts']) or '-'}   inherits: {stats['fallback']}")
+    for item, why in stats["failed"]:
+        print(f"  failed: {item}: {why}")
+
+
+def _migrate_legacy(cfg):
+    """monotile 0.1 made one theme named after cfg["name"]; switch to the matching
+    variant if it was active, then delete it."""
+    legacy = C.theme_dir(cfg)
+    if os.path.exists(os.path.join(legacy, theme.MARKER)):
+        if desktop.current_theme() == cfg["name"]:
+            desktop.apply(theme.variant_name(cfg, cfg["shape"]))
+        theme.remove(cfg)
+        print(f"replaced the old single theme '{cfg['name']}' with {', '.join(theme.variant_names(cfg))}")
+
+
+def _adopt_legacy(cfg):
+    """Seed Monotile-Circle from a monotile 0.1 single theme (hard links, so it is
+    instant and uses no extra space): its folder/file/device/status icons are
+    identical, and only the tile icons get redone."""
+    import shutil
+    legacy = C.theme_dir(cfg)
+    circle = C.theme_dir(dict(cfg, name=theme.variant_name(cfg, "circle")))
+    if os.path.exists(os.path.join(legacy, theme.MARKER)) and not os.path.exists(circle):
+        shutil.copytree(legacy, circle, symlinks=True, copy_function=os.link)
+        old_m = os.path.join(C.cache_dir(), f"manifest-{cfg['name']}.json")
+        new_m = os.path.join(C.cache_dir(), f"manifest-{theme.variant_name(cfg, 'circle')}.json")
+        if os.path.exists(old_m) and not os.path.exists(new_m):
+            shutil.copyfile(old_m, new_m)
+
+
 def cmd_generate(a):
     if getattr(a, "contexts", None):
         a.contexts = [c.strip() for c in a.contexts.split(",") if c.strip()]
     cfg = load_cfg(a, persist=True)
     fallback = resolve_fallback(cfg)
     t = time.time()
-    s = theme.generate(cfg, fallback, dry_run=a.dry_run)
-    if not a.quiet or s["failed"]:
-        verb = "would convert" if a.dry_run else "converted"
-        print(f"{cfg['name']}: {verb} {s['converted']}, aliases {s['linked']}, already mono {s['kept']}, overrides {s['overrides']}, "
-              f"unchanged {s['unchanged']}, removed {s['removed']}, failed {len(s['failed'])} "
-              f"in {time.time() - t:.1f}s")
-        print(f"  contexts: {', '.join(s['contexts']) or '-'}")
-        print(f"  source: {s['source']}   inherits: {fallback}   folder: {C.theme_dir(cfg)}")
-        for name, why in s["failed"]:
-            print(f"  failed: {name}: {why}")
+    if not a.dry_run:
+        _adopt_legacy(cfg)
+    results = theme.generate_all(cfg, fallback, dry_run=a.dry_run)
+    if not a.quiet or any(s["failed"] for s in results.values()):
+        for name, s in results.items():
+            _report(s, name, a, time.time() - t)
+        skipped = next(iter(results.values()))["skipped"]
         if a.verbose:
-            for did, why in s["skipped"]:
+            for did, why in skipped:
                 print(f"  skipped: {did} ({why})")
-        elif s["skipped"]:
-            print(f"  {len(s['skipped'])} apps skipped (use -v to list): icons given as file paths or not found")
-    if a.refresh and s["changed"] and not a.dry_run and desktop.is_active(cfg["name"]):
-        desktop.refresh(cfg["name"], fallback)
+        elif skipped:
+            print(f"  {len(skipped)} apps skipped (use -v to list): icons given as file paths or not found")
+    if not a.dry_run:
+        _migrate_legacy(cfg)
+    active = desktop.current_theme()
+    if a.refresh and not a.dry_run and active in results and any(s["changed"] for s in results.values()):
+        desktop.refresh(active, fallback)
 
 
 def cmd_apply(a):
     cfg = load_cfg(a, persist=True)
     fallback = resolve_fallback(cfg)
-    if not os.path.exists(os.path.join(C.theme_dir(cfg), "index.theme")):
-        s = theme.generate(cfg, fallback)
-        print(f"generated {s['converted'] + s['overrides']} icons")
-    keys = desktop.apply(cfg["name"])
-    print(f"icon theme set to {cfg['name']} ({', '.join(s for s, _ in keys)})")
+    if not all(os.path.exists(os.path.join(C.theme_dir(dict(cfg, name=n)), "index.theme"))
+               for n in theme.variant_names(cfg)):
+        theme.generate_all(cfg, fallback)
+    name = theme.variant_name(cfg, cfg["shape"])
+    keys = desktop.apply(name)
+    _migrate_legacy(cfg)
+    print(f"icon theme set to {name} ({', '.join(s for s, _ in keys)})")
+    print("Switch shape any time with: apply --shape circle|squircle")
     print("Some panels cache icons: if one still shows the old icon, log out and back in.")
 
 
@@ -107,14 +147,13 @@ def cmd_revert(a):
 
 def cmd_status(a):
     cfg = C.load()
-    tdir = C.theme_dir(cfg)
-    n = 0
-    for _, _, files in os.walk(tdir):
-        n += sum(1 for f in files if f.endswith(".png"))
     print(f"desktop:   {desktop.desktop_name()}")
-    print(f"theme:     {cfg['name']} ({'generated' if os.path.isdir(tdir) else 'not generated'}, {n} files)")
-    print(f"active:    {desktop.is_active(cfg['name'])} (current icon theme: {desktop.current_theme()})")
-    print(f"style:     {cfg['tones']} tones on a {cfg['shape']}")
+    for name in theme.variant_names(cfg):
+        tdir = C.theme_dir(dict(cfg, name=name))
+        n = sum(1 for _, _, files in os.walk(tdir) for f in files if f.endswith(".png"))
+        print(f"theme:     {name} ({'generated' if os.path.isdir(tdir) else 'not generated'}, {n} files)")
+    print(f"active:    {desktop.current_theme()}")
+    print(f"style:     {cfg['tones']} tones, applied shape {cfg['shape']}")
     print(f"source:    {cfg['source'] or theme.default_source(cfg['name'])}   "
           f"fallback: {cfg['fallback'] or '(set at first run)'}")
     print(f"overrides: {len(theme.find_overrides())} in {C.overrides_dir()}")
@@ -135,12 +174,13 @@ def cmd_watch(a):
 def cmd_uninstall(a):
     cfg = C.load()
     if not a.yes:
-        print(f"This reverts the icon theme, disables the watcher and deletes {C.theme_dir(cfg)}.")
+        print("This reverts the icon theme, disables the watcher and deletes the themes "
+              f"{', '.join(theme.variant_names(cfg))} in {C.icons_dir()}.")
         print(f"Your settings and overrides in {C.config_dir()} are kept. Re-run with --yes to proceed.")
         return
     desktop.revert()
     watch.disable()
-    theme.remove(cfg)
+    theme.remove_all(cfg)
     print(f"monotile uninstalled (settings and overrides kept in {C.config_dir()})")
 
 
@@ -153,7 +193,8 @@ def build_parser():
     sub = p.add_subparsers(dest="cmd", required=True)
 
     style = argparse.ArgumentParser(add_help=False)
-    style.add_argument("--shape", choices=("circle", "squircle"))
+    style.add_argument("--shape", choices=("circle", "squircle"),
+                       help="which of the two themes `apply` activates (both are always generated)")
     style.add_argument("--tones", type=int, choices=(2, 3, 4),
                        help="2 = white stencil (default), 3 = grey bodies, 4 = white/light/mid grey")
     style.add_argument("--source", help="icon theme to read app icons from (default: Papirus if installed)")

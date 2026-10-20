@@ -118,3 +118,76 @@ class ScalingAndSystemIcons(FakeDesktop):
     def test_old_saved_context_list_means_everything(self):
         cfg = C.validate({"contexts": ["apps", "categories", "places", "mimetypes", "devices", "status", "emblems"]})
         self.assertIn("actions", cfg["contexts"])
+
+
+class ThemePair(FakeDesktop):
+    def setUp(self):
+        super().setUp()
+        self.make_theme("Src", dirs={"48x48/apps": (48, "Applications"), "48x48/places": (48, "Places")})
+        self.add_icon("Src", "48x48/apps", "calc")
+        self.add_icon("Src", "48x48/places", "folder")
+        self.add_app("calc", "calc")
+        self.cfg = C.validate({"source": "Src", "fallback": "Src", "sizes": [48]})
+
+    def path(self, theme_name, ctx, name):
+        return os.path.join(C.icons_dir(), theme_name, "48x48", ctx, name + ".png")
+
+    def test_circle_is_full_and_squircle_only_tiles(self):
+        out = theme.generate_all(self.cfg, "Src", workers=1)
+        self.assertEqual(sorted(out), ["Monotile-Circle", "Monotile-Squircle"])
+        self.assertTrue(os.path.exists(self.path("Monotile-Circle", "places", "folder")))
+        self.assertTrue(os.path.exists(self.path("Monotile-Squircle", "apps", "calc")))
+        self.assertFalse(os.path.exists(self.path("Monotile-Squircle", "places", "folder")))
+        with open(os.path.join(C.icons_dir(), "Monotile-Squircle", "index.theme")) as f:
+            self.assertIn("Inherits=Monotile-Circle,Src,hicolor", f.read())
+
+    def test_shapes_differ(self):
+        from PIL import Image
+        theme.generate_all(self.cfg, "Src", workers=1)
+        corner = lambda t: Image.open(self.path(t, "apps", "calc")).convert("RGBA").getpixel((5, 5))[3]
+        self.assertLess(corner("Monotile-Circle"), corner("Monotile-Squircle"))   # squircle fills corners more
+
+    def test_variant_names_rejected_as_fallback(self):
+        with self.assertRaises(ValueError):
+            C.validate({"fallback": "Monotile-Circle"})
+
+    def test_remove_all(self):
+        theme.generate_all(self.cfg, "Src", workers=1)
+        theme.remove_all(self.cfg)
+        self.assertFalse(os.path.exists(os.path.join(C.icons_dir(), "Monotile-Circle")))
+        self.assertFalse(os.path.exists(os.path.join(C.icons_dir(), "Monotile-Squircle")))
+
+
+class AliasRepair(FakeDesktop):
+    def test_removing_a_link_target_rebuilds_the_aliases(self):
+        # an app tile and a menu category share one image: the category is stored as a
+        # link to the app's file; uninstalling the app must not leave a broken link
+        self.make_theme("Al", dirs={"48x48/apps": (48, "Applications")})
+        img = self.add_icon("Al", "48x48/apps", "tool")
+        os.symlink(os.path.basename(img), os.path.join(os.path.dirname(img), "tool-category.png"))
+        app = self.add_app("tool", "tool")
+        ddir = os.path.join(self.sys, "desktop-directories")
+        os.makedirs(ddir)
+        with open(os.path.join(ddir, "Tools.directory"), "w") as f:
+            f.write("[Desktop Entry]\nType=Directory\nName=Tools\nIcon=tool-category\n")
+        cfg = C.validate({"source": "Al", "fallback": "Al", "sizes": [48], "contexts": ["apps", "categories"]})
+        theme.generate(cfg, "Al", workers=1)
+        cat = os.path.join(C.icons_dir(), "Monotile", "48x48", "categories", "tool-category.png")
+        self.assertTrue(os.path.islink(cat))                     # stored as an alias of the app tile
+        os.unlink(app)
+        theme.generate(cfg, "Al", workers=1)
+        self.assertTrue(os.path.exists(cat))                     # rebuilt, not dangling
+        self.assertFalse(os.path.exists(os.path.join(C.icons_dir(), "Monotile", "48x48", "apps", "tool.png")))
+
+
+class NativeNamesStayNative(FakeDesktop):
+    def test_app_using_a_folder_icon_gets_no_tile_copy(self):
+        self.make_theme("Nv", dirs={"48x48/apps": (48, "Applications"), "48x48/places": (48, "Places")})
+        self.add_icon("Nv", "48x48/apps", "folder")
+        self.add_icon("Nv", "48x48/places", "folder")
+        self.add_app("files", "folder")
+        cfg = C.validate({"source": "Nv", "fallback": "Nv", "sizes": [48]})
+        theme.generate_all(cfg, "Nv", workers=1)
+        for t in ("Monotile-Circle", "Monotile-Squircle"):
+            self.assertFalse(os.path.exists(os.path.join(C.icons_dir(), t, "48x48", "apps", "folder.png")))
+        self.assertTrue(os.path.exists(os.path.join(C.icons_dir(), "Monotile-Circle", "48x48", "places", "folder.png")))

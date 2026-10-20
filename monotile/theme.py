@@ -58,6 +58,38 @@ _COLOUR_VARIANT = re.compile(
     r"yaru|yellow)(-|$)")
 
 
+SHAPE_TITLES = {"circle": "Circle", "squircle": "Squircle"}
+TILE_CONTEXTS = [c for c, _, st in CONTEXTS if st == "tile"]
+
+
+def variant_name(cfg, shape):
+    """Installed theme name for a tile shape, e.g. Monotile-Squircle."""
+    return f"{cfg['name']}-{SHAPE_TITLES[shape]}"
+
+
+def variant_names(cfg):
+    return [variant_name(cfg, s) for s in SHAPE_TITLES]
+
+
+def generate_all(cfg, fallback, dry_run=False, workers=None):
+    """Build both themes. Monotile-Circle holds every icon; Monotile-Squircle holds
+    only the tile icons (apps, menu categories) and inherits the rest from Circle,
+    so the second shape costs a few seconds and a few MB instead of a full copy."""
+    circle = dict(cfg, name=variant_name(cfg, "circle"), shape="circle")
+    squircle = dict(cfg, name=variant_name(cfg, "squircle"), shape="squircle",
+                    contexts=[c for c in cfg["contexts"] if c in TILE_CONTEXTS] or ["apps"])
+    return {
+        circle["name"]: generate(circle, fallback, dry_run=dry_run, workers=workers),
+        squircle["name"]: generate(squircle, f"{circle['name']},{fallback}", dry_run=dry_run, workers=workers),
+    }
+
+
+def remove_all(cfg):
+    """Delete both themes and a legacy single-theme folder from monotile 0.1."""
+    for name in variant_names(cfg) + [cfg["name"]]:
+        remove(dict(cfg, name=name))
+
+
 def default_source(name):
     for t in ("Papirus", "Papirus-Dark"):
         if t != name and Theme(t).exists:
@@ -102,8 +134,18 @@ def plan(cfg):
     overrides = find_overrides()
     contexts = cfg["contexts"]
     jobs, skipped = {}, []
+    src = Theme(source)
+    # names the source draws as a folder, file type or device keep that native look
+    # even when an app or menu category uses them; GTK looks names up regardless of
+    # context, so a tile version would replace the folder icon in the file manager too
+    native_names = set()
+    for _, fd_context, style in CONTEXTS:
+        if style == "native" and fd_context in ("Places", "MimeTypes", "Devices"):
+            native_names |= set(src.index(fd_context))
 
     def add(ctx, name, path):
+        if ctx in TILE_CONTEXTS and name in native_names:
+            return
         if name in overrides:
             jobs[(ctx, name)] = ("override", overrides[name])
         elif path:
@@ -115,7 +157,7 @@ def plan(cfg):
             if name is None:
                 skipped.append((app.desktop_id, "icon is a file path" if app.icon_is_path else "unsafe icon name"))
                 continue
-            if ("apps", name) in jobs:
+            if ("apps", name) in jobs or name in native_names:
                 continue
             path = resolver.resolve(name)
             if path or name in overrides:
@@ -125,7 +167,6 @@ def plan(cfg):
         for name in overrides:                    # overrides for icons no app uses yet
             jobs.setdefault(("apps", name), ("override", overrides[name]))
 
-    src = Theme(source)
     if "apps" in contexts:
         for name, (_, path) in sorted(src.index("Applications").items()):
             if SYSTEM_APP_ICON.match(name) and _safe(name) and ("apps", name) not in jobs:
@@ -228,10 +269,40 @@ def generate(cfg, fallback, dry_run=False, log=print, workers=None):
     lock = open(os.path.join(C.cache_dir(), "lock"), "w")
     fcntl.flock(lock, fcntl.LOCK_EX)
     try:
-        return _generate(cfg, fallback, tdir, dry_run, workers)
+        stats = _generate(cfg, fallback, tdir, dry_run, workers)
+        if not dry_run and _drop_dangling(cfg, tdir):
+            # an alias pointed at a file that was removed this run: rebuild those once
+            again = _generate(cfg, fallback, tdir, dry_run, workers)
+            for k in ("converted", "linked", "kept", "overrides"):
+                stats[k] += again[k]
+            stats["failed"] += again["failed"]
+            stats["changed"] = True
+        return stats
     finally:
         fcntl.flock(lock, fcntl.LOCK_UN)
         lock.close()
+
+
+def _drop_dangling(cfg, tdir):
+    """Delete links whose target is gone and forget them in the manifest, so the next
+    pass regenerates them. Returns True if anything was dropped."""
+    dangling = []
+    for root, _, files in os.walk(tdir):
+        for f in files:
+            p = os.path.join(root, f)
+            if os.path.islink(p) and not os.path.exists(p):
+                dangling.append(p)
+    if not dangling:
+        return False
+    mpath = _manifest_path(cfg)
+    with open(mpath, encoding="utf-8") as fh:
+        manifest = json.load(fh)
+    for p in dangling:
+        ctx, fname = os.path.basename(os.path.dirname(p)), os.path.basename(p)
+        manifest.pop(f"{ctx}/{os.path.splitext(fname)[0]}", None)
+        os.unlink(p)
+    C.atomic_write(mpath, json.dumps(manifest, indent=1, sort_keys=True))
+    return True
 
 
 def _manifest_path(cfg):

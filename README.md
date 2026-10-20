@@ -30,6 +30,8 @@ Every size folder is declared scalable over a range, so icons follow any size yo
 (file manager zoom, desktop icon size, panel size) instead of snapping to fixed sizes.
 
 Papirus's extra folder colour variants (`folder-red-…`) are skipped; the default folders are converted.
+A name that the source theme draws as a folder, file type or device keeps that native look even
+where an app or menu category uses it, so launchers and the file manager agree.
 
 > Unofficial fan project. Not affiliated with or endorsed by Nothing Technology Limited.
 > No Nothing fonts, wallpapers or artwork are included.
@@ -125,7 +127,8 @@ No installation needed; run it straight from a clone:
 git clone https://github.com/<you>/monotile.git
 cd monotile
 ./run-monotile preview -o preview.png   # before/after sheet of your apps; changes nothing
-./run-monotile apply                    # generate the theme and switch to it
+./run-monotile apply                    # generate both themes and switch to Monotile-Circle
+./run-monotile apply --shape squircle   # or switch to Monotile-Squircle
 ./run-monotile watch enable             # keep it updated when apps are installed or removed
 ```
 
@@ -139,8 +142,8 @@ You can also install it with `pipx install .` and run `monotile` instead of `./r
 | Command | What it does |
 |---|---|
 | `preview` | Renders a before/after contact sheet of your apps. Writes only the image. |
-| `generate` | Creates or updates `~/.local/share/icons/Monotile`. Only changed icons are reconverted (in parallel; names that share one image are converted once and symlinked); `--dry-run` reports without writing. |
-| `apply` | Generates if needed, then sets the icon theme. Your previous theme is saved once. |
+| `generate` | Creates or updates two themes in `~/.local/share/icons`: **Monotile-Circle** (every icon) and **Monotile-Squircle** (only the app and menu tiles; inherits the rest from Monotile-Circle, so it costs seconds and a few MB). Both show up in your desktop's icon theme list. Only changed icons are reconverted (in parallel; names that share one image are converted once and symlinked); `--dry-run` reports without writing. |
+| `apply` | Generates if needed, then sets Monotile-Circle or, with `--shape squircle`, Monotile-Squircle. Your previous theme is saved once. |
 | `revert` | Restores the icon theme you had before `apply`. |
 | `status` | Shows what is generated, active and watched. |
 | `watch enable\|disable\|status` | Installs a systemd **user** path unit that regenerates within seconds when a `.desktop` file is added, changed or removed. No root, no background daemon. |
@@ -150,11 +153,11 @@ Style options work with `preview`, `generate` and `apply`, and are remembered:
 
 | Option | Values | Default |
 |---|---|---|
-| `--shape` | `circle`, `squircle` | `circle` |
+| `--shape` | which theme `apply` activates: `circle`, `squircle` | `circle` |
 | `--tones` | `2` white stencil · `3` large grey bodies filled grey · `4` white / light grey / mid grey | `2` |
 | `--source` | icon theme to read app icons from | Papirus if installed |
 | `--fallback` | icon theme for everything that is not an app icon (folders, file types…) | your icon theme at first run |
-| `--name` | name of the generated theme | `Monotile` |
+| `--name` | name prefix of the generated themes | `Monotile` |
 | `--contexts` (generate) | which kinds to convert: `apps,categories,places,mimetypes,devices,status,emblems,actions` | all |
 | `--context` (preview) | which kind to show in the preview sheet | `apps` |
 
