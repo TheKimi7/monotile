@@ -109,7 +109,7 @@ def _groups(keys):
     return out
 
 
-def poster(icon, colours=10):
+def poster(icon, colours=10, tones=4):
     """Return (RGBA artwork at WORK size with plate removed, plate_bbox or None, mode)."""
     alpha = _bin(icon.getchannel("A"))
     if not alpha.getbbox():
@@ -169,9 +169,37 @@ def poster(icon, colours=10):
     if holes is not None:
         art.paste(TONES[0], (0, 0), holes)
         mask = ImageChops.lighter(mask, holes)
+    if tones == 2:
+        art, mask = _two_tone(q, entries, background, mask)
     out = art.convert("RGBA")
     out.putalpha(mask)
     return out, (alpha.getbbox() if plate else None), ("plate" if plate else "logo")
+
+
+def _two_tone(q, entries, background, mask):
+    """Everything white; where two genuinely different parts meet, cut a dark gap
+    so they stay separate shapes (a stencil). Similar colours (gradient bands) are
+    merged first so they do not produce false cuts."""
+    parent = {i: i for i, _ in entries}
+
+    def find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+    for a_i, a_c in entries:
+        for b_i, b_c in entries:
+            if a_i < b_i and _dist(a_c, b_c) < 40:
+                parent[find(a_i)] = find(b_i)
+    group = bytes((find(i) * 23 + 7) % 256 if i in parent else 0 for i in range(256))
+    regions = Image.frombytes("L", q.size, q.tobytes().translate(group))
+    edges = regions.filter(ImageFilter.FIND_EDGES).point(lambda v: 255 if v else 0)
+    gap = round(WORK * 0.008)
+    edges = edges.filter(ImageFilter.MaxFilter(gap * 2 + 1))
+    inside = _erode(mask, gap + 2)                      # never nibble the outer silhouette
+    cuts = ImageChops.multiply(edges, inside)
+    art = Image.new("RGB", q.size, TONES[0])
+    return art, ImageChops.subtract(mask, cuts)
 
 
 # ------------------------------------------------------------------ compose
@@ -198,6 +226,6 @@ def compose(art, plate_box, size, shape="circle"):
     return out.resize((size, size), Image.LANCZOS)
 
 
-def convert(path, sizes=(256,), shape="circle"):
-    art, box, mode = poster(render(path, WORK))
+def convert(path, sizes=(256,), shape="circle", tones=4):
+    art, box, mode = poster(render(path, WORK), tones=tones)
     return {s: compose(art, box, s, shape) for s in sizes}, mode
