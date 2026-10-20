@@ -60,6 +60,20 @@ Every desklet also has a size, card opacity and accent colour setting.
 The number font is Nothing's *Ndot 57* and the labels use *JetBrains Mono*; neither is
 bundled. Without them the desklets fall back to your default fonts.
 
+## Menu button icon
+
+`assets/` has three dot-matrix menu icons in the same style (white dots, red centre):
+`monotile-menu-hex12.svg` (hexagon ring), `monotile-menu-hex6.svg` and `monotile-menu-hex19.svg`.
+
+```sh
+mkdir -p ~/.local/share/icons/hicolor/scalable/apps
+cp assets/monotile-menu-hex12.svg ~/.local/share/icons/hicolor/scalable/apps/monotile-menu.svg
+```
+
+Then on Cinnamon: right-click the menu button > Configure > *Use a custom icon and label* on,
+icon `monotile-menu`, and clear the text field. Any icon theme can use it, since it is installed
+under `hicolor`. `python3 assets/make_menu_icons.py` regenerates the SVGs.
+
 ## Why a generator?
 
 On Android, apps ship a separate monochrome layer and the launcher simply tints it.
