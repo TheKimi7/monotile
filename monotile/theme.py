@@ -41,13 +41,13 @@ CONTEXTS = [
     ("status", "Status", "native"),
     ("emblems", "Emblems", "native"),
     ("actions", "Actions", "native"),
+    ("emotes", "Emotes", "native"),
+    ("animations", "Animations", "native"),
 ]
 # kinds where icons that are already monochrome (tray symbols, toolbar buttons) are
 # left alone and inherited, and only coloured ones are converted
-KEEP_MONO = ("status", "actions")
-# session and system icons the shell shows outside any app entry (menu power, lock and
-# log-out buttons, settings): converted like apps even though no .desktop file uses them
-SYSTEM_APP_ICON = re.compile(r"^system-")
+KEEP_MONO = ("status", "actions", "animations")
+
 CONTEXT_NAMES = [c for c, _, _ in CONTEXTS]
 
 # Papirus ships every folder in ~25 colours; only the default set is ever used
@@ -186,9 +186,12 @@ def plan(cfg):
             jobs.setdefault(("apps", name), ("override", overrides[name]))
 
     if "apps" in contexts:
+        # every app-style icon the source theme has, not only those of installed apps,
+        # so the theme stays complete for settings modules, dialogs and future apps
         for name, (_, path) in sorted(src.index("Applications").items()):
-            if SYSTEM_APP_ICON.match(name) and _safe(name) and ("apps", name) not in jobs:
+            if _safe(name) and ("apps", name) not in jobs:
                 add("apps", name, path)
+
     if "categories" in contexts:
         for name in sorted(menu_category_icons()):
             add("categories", name, resolver.resolve(name))
@@ -196,11 +199,15 @@ def plan(cfg):
         if ctx not in contexts:
             continue
         index = src.index(fd_context)
+        style = cfg.get("file_style", "black")
         for name, (_, path) in sorted(index.items()):
-            if _safe(name) and not (ctx == "places" and _COLOUR_VARIANT.match(name)):
-                if ctx == "places" and cfg.get("file_style", "black") == "black":
-                    path = black_variant(index, name, path)
-                add(ctx, name, path)
+            if not _safe(name):
+                continue
+            if ctx == "places" and style == "black":
+                # every colour variant (folder-red-music…) shows the matching black folder;
+                # they share its source image, so they become links, not new conversions
+                path = black_variant(index, _COLOUR_VARIANT.sub(r"\1\3", name), path)
+            add(ctx, name, path)
     return source, jobs, skipped
 
 

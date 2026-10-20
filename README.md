@@ -21,12 +21,12 @@ that theme up to date as you install and remove apps.
 
 | Icons | Style |
 |---|---|
-| Apps, application-menu categories, session icons (shut down, lock, log out, suspend…) | white stencil on a dark circle or squircle |
+| Every app-style icon of the source theme (not only installed apps), application-menu categories, session icons (shut down, lock, log out, suspend…), plus your installed apps' own icons | white stencil on a dark circle or squircle |
 | Folders | the source theme's black folder variants (Papirus `folder-black-…`), greyscale where none exists |
 | File types | the source icons exactly as drawn, in greyscale |
-| Devices and emblems | white stencil in the icon's own shape (no tile) |
-| Status and action icons that are coloured | white stencil in their own shape |
-| Status and action icons that are already monochrome, panel, tray and toolbar (symbolic) icons | left as they are |
+| Devices, emblems and emoji faces | white stencil in the icon's own shape (no tile) |
+| Status, action and animation icons that are coloured | white stencil in their own shape |
+| Status, action and animation icons that are already monochrome, panel, tray and toolbar (symbolic) icons | left as they are |
 
 Every size folder is declared scalable over a range, so icons follow any size you pick
 (file manager zoom, desktop icon size, panel size) instead of snapping to fixed sizes.
@@ -148,6 +148,7 @@ You can also install it with `pipx install .` and run `monotile` instead of `./r
 | `apply` | Generates if needed, then sets Monotile-Circle or, with `--shape squircle`, Monotile-Squircle. Your previous theme is saved once. |
 | `revert` | Restores the icon theme you had before `apply`. |
 | `status` | Shows what is generated, active and watched. |
+| `audit` | Looks up every icon name (all of the source theme, your apps and menu categories) through GTK exactly as the desktop does, and lists any that still come from another theme. |
 | `watch enable\|disable\|status` | Installs a systemd **user** path unit that regenerates within seconds when a `.desktop` file is added, changed or removed. No root, no background daemon. |
 | `uninstall --yes` | Reverts, disables the watcher and deletes the generated theme. Settings and overrides are kept. |
 
@@ -200,8 +201,9 @@ discovered. Reports from other desktops are very welcome.
   (common for Snap and AppImage) cannot be themed by any icon theme. `generate -v` lists them.
 - **KDE apps on other desktops** read their icon theme from `~/.config/kdeglobals`, not from
   GTK settings.
-- **First full run takes a few minutes** (about 2,000 unique images with Papirus; about 4 minutes
-  on a 12-thread laptop) and uses roughly 100 MB. Later runs only touch what changed.
+- **First full run takes about 5 minutes** on a 12-thread laptop (about 4,000 unique app images per
+  shape, plus folders, files and the rest) and uses about 570 MB for both themes. Later runs only
+  touch what changed.
 - **Imperfect conversions.** Icons whose symbol has the same colour as their background, or
   that are mostly a plain screen, can lose detail. Use an override.
 

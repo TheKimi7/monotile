@@ -161,6 +161,31 @@ def cmd_status(a):
     print(f"watcher:   {watch.status()}")
 
 
+def cmd_audit(a):
+    import json
+    from .audit import audit
+    cfg = C.load()
+    name = theme.variant_name(cfg, a.shape or cfg["shape"])
+    kept = set()
+    for variant in theme.variant_names(cfg):
+        try:
+            with open(os.path.join(C.cache_dir(), f"manifest-{variant}.json"), encoding="utf-8") as f:
+                kept |= {k.split("/", 1)[1] for k, v in json.load(f).items() if v.get("passthrough")}
+        except (OSError, ValueError):
+            pass
+    r = audit(name, cfg["source"] or theme.default_source(cfg["name"]), kept)
+    print(f"{name}: {r['total']} icon names checked")
+    print(f"  {r['ours']} drawn by monotile")
+    print(f"  {len(r['kept'])} already monochrome, inherited unchanged on purpose")
+    print(f"  {len(r['outside'])} still coming from another theme")
+    print(f"  {len(r['missing'])} not found anywhere")
+    for n, p in r["outside"][: a.limit]:
+        print(f"    outside: {n}  ({p.split('/icons/')[-1]})")
+    if len(r["outside"]) > a.limit:
+        print(f"    ... and {len(r['outside']) - a.limit} more (use --limit)")
+    return 0 if not r["outside"] else 1
+
+
 def cmd_watch(a):
     if a.action == "enable":
         watch.enable()
@@ -225,6 +250,11 @@ def build_parser():
     ap.set_defaults(func=cmd_apply)
     sub.add_parser("revert", help="switch back to the icon theme you had before").set_defaults(func=cmd_revert)
     sub.add_parser("status", help="show what is generated, active and watched").set_defaults(func=cmd_status)
+
+    au = sub.add_parser("audit", help="check every icon name resolves inside the generated theme")
+    au.add_argument("--shape", choices=("circle", "squircle"))
+    au.add_argument("--limit", type=int, default=40)
+    au.set_defaults(func=cmd_audit)
 
     w = sub.add_parser("watch", help="regenerate automatically when apps change (systemd --user)")
     w.add_argument("action", choices=("enable", "disable", "status"))

@@ -50,9 +50,9 @@ class AllIcons(FakeDesktop):
                         os.path.islink(self.out("mimetypes", "text-plain")))
         self.assertTrue(os.path.exists(self.out("mimetypes", "text-x-log")))
 
-    def test_skips_colour_variants_and_symbolic(self):
+    def test_colour_variants_included_symbolic_skipped(self):
         theme.generate(self.cfg, "Full", workers=1)
-        self.assertFalse(os.path.exists(self.out("places", "folder-red-documents")))
+        self.assertTrue(os.path.exists(self.out("places", "folder-red-documents")))   # no coloured fallback
         self.assertFalse(os.path.exists(self.out("status", "volume-symbolic")))
 
     def test_monochrome_status_icons_are_inherited(self):
@@ -92,11 +92,11 @@ class ScalingAndSystemIcons(FakeDesktop):
         self.cfg = C.validate({"source": "Sys", "fallback": "Sys", "sizes": [16, 48, 256]})
         self.tdir = C.theme_dir(self.cfg)
 
-    def test_system_icons_converted_without_an_app(self):
+    def test_every_source_app_icon_is_converted(self):
         theme.generate(self.cfg, "Sys", workers=1)
         apps = os.path.join(self.tdir, "48x48", "apps")
         self.assertTrue(os.path.exists(os.path.join(apps, "system-shutdown.png")))
-        self.assertFalse(os.path.exists(os.path.join(apps, "random-unused-app.png")))
+        self.assertTrue(os.path.exists(os.path.join(apps, "random-unused-app.png")))
 
     def test_actions_keep_monochrome(self):
         s = theme.generate(self.cfg, "Sys", workers=1)
@@ -159,25 +159,20 @@ class ThemePair(FakeDesktop):
 
 
 class AliasRepair(FakeDesktop):
-    def test_removing_a_link_target_rebuilds_the_aliases(self):
-        # an app tile and a menu category share one image: the category is stored as a
-        # link to the app's file; uninstalling the app must not leave a broken link
-        self.make_theme("Al", dirs={"48x48/apps": (48, "Applications")})
-        img = self.add_icon("Al", "48x48/apps", "tool")
-        os.symlink(os.path.basename(img), os.path.join(os.path.dirname(img), "tool-category.png"))
-        app = self.add_app("tool", "tool")
-        ddir = os.path.join(self.sys, "desktop-directories")
-        os.makedirs(ddir)
-        with open(os.path.join(ddir, "Tools.directory"), "w") as f:
-            f.write("[Desktop Entry]\nType=Directory\nName=Tools\nIcon=tool-category\n")
-        cfg = C.validate({"source": "Al", "fallback": "Al", "sizes": [48], "contexts": ["apps", "categories"]})
+    def test_broken_alias_is_rebuilt(self):
+        self.make_theme("Al", dirs={"48x48/mimetypes": (48, "MimeTypes")})
+        img = self.add_icon("Al", "48x48/mimetypes", "a-type")
+        os.symlink(os.path.basename(img), os.path.join(os.path.dirname(img), "b-type.png"))
+        cfg = C.validate({"source": "Al", "fallback": "Al", "sizes": [48], "contexts": ["mimetypes"]})
         theme.generate(cfg, "Al", workers=1)
-        cat = os.path.join(C.icons_dir(), "Monotile", "48x48", "categories", "tool-category.png")
-        self.assertTrue(os.path.islink(cat))                     # stored as an alias of the app tile
-        os.unlink(app)
+        d = os.path.join(C.icons_dir(), "Monotile", "48x48", "mimetypes")
+        real = [f for f in os.listdir(d) if not os.path.islink(os.path.join(d, f))]
+        link = [f for f in os.listdir(d) if os.path.islink(os.path.join(d, f))]
+        self.assertEqual((len(real), len(link)), (1, 1))
+        os.unlink(os.path.join(d, real[0]))                     # the alias now points nowhere
         theme.generate(cfg, "Al", workers=1)
-        self.assertTrue(os.path.exists(cat))                     # rebuilt, not dangling
-        self.assertFalse(os.path.exists(os.path.join(C.icons_dir(), "Monotile", "48x48", "apps", "tool.png")))
+        for f in ("a-type.png", "b-type.png"):
+            self.assertTrue(os.path.exists(os.path.join(d, f)), f)
 
 
 class NativeNamesStayNative(FakeDesktop):
