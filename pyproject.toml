@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "monotile"
+version = "0.1.0"
+description = "Nothing-inspired monochrome icon theme generator for Linux desktops"
+readme = "README.md"
+license = { text = "GPL-3.0-or-later" }
+requires-python = ">=3.9"
+# PyGObject (GdkPixbuf + librsvg) renders SVG icons; it is best installed from your
+# distribution (python3-gi), so it is not listed as a pip dependency.
+dependencies = ["Pillow>=9.1"]
+classifiers = [
+    "Environment :: X11 Applications :: GTK",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Topic :: Desktop Environment",
+]
+
+[project.scripts]
+monotile = "monotile.cli:main"
+
+[tool.setuptools]
+packages = ["monotile"]
