@@ -26,6 +26,7 @@ import subprocess
 from . import base
 from . import config as C
 from . import poster
+from .progress import Bar, note
 from .iconfile import render
 from .lookup import SAFE_NAME, IconResolver, Theme, installed_apps, menu_category_icons
 
@@ -297,6 +298,17 @@ def _convert_job(job):
     return out
 
 
+def _die_with_parent():
+    """Worker setup: on Linux, end with the parent, so stopping a run (Ctrl+C, closed
+    terminal) never leaves idle converter processes behind."""
+    try:
+        import ctypes
+        import signal
+        ctypes.CDLL("libc.so.6", use_errno=True).prctl(1, signal.SIGTERM)    # PR_SET_PDEATHSIG
+    except (OSError, AttributeError):
+        pass
+
+
 def _link(target, link):
     """Atomically make `link` a relative symlink to `target`."""
     os.makedirs(os.path.dirname(link), exist_ok=True)
@@ -345,6 +357,7 @@ def _write_index(tdir, name, comment, inherits, dirs):
 def update_icon_cache(tdir):
     exe = shutil.which("gtk-update-icon-cache") or shutil.which("gtk4-update-icon-cache")
     if exe:
+        note(f"{os.path.basename(tdir)}: updating the icon cache…")
         subprocess.run([exe, "-f", "-t", "-q", tdir], check=False,
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
@@ -406,6 +419,8 @@ def _generate(cfg, fallback, tdir, dry_run, workers):
         manifest = {}
     if manifest and not all("/" in k for k in manifest):        # v1 manifest: apps only
         manifest = {f"apps/{k}": v for k, v in manifest.items()}
+    if not dry_run:
+        note(f"{cfg['name']}: checking icons…")
     source, jobs, skipped = plan(cfg)
     stats = {"source": source, "fallback": fallback, "converted": 0, "overrides": 0, "linked": 0, "kept": 0,
              "unchanged": 0, "removed": 0, "failed": [], "skipped": skipped,
@@ -451,11 +466,13 @@ def _generate(cfg, fallback, tdir, dry_run, workers):
 
     jobs_list = [(g, (todo[m[0]][2], g[0], g[2], cfg["tones"], cfg["sizes"], g[3])) for g, m in groups.items()]
     results = {}
+    bar = Bar(cfg["name"], len(jobs_list))
     if len(jobs_list) > 4:
-        with cf.ProcessPoolExecutor(max_workers=workers or os.cpu_count()) as ex:
+        with cf.ProcessPoolExecutor(max_workers=workers or os.cpu_count(), initializer=_die_with_parent) as ex:
             futures = {ex.submit(_convert_job, j): g for g, j in jobs_list}
             for fut in cf.as_completed(futures):
                 results[futures[fut]] = fut
+                bar.step()
     else:
         for g, j in jobs_list:
             f = cf.Future()
@@ -464,6 +481,9 @@ def _generate(cfg, fallback, tdir, dry_run, workers):
             except Exception as e:
                 f.set_exception(e)
             results[g] = f
+            bar.step()
+    if jobs_list:
+        bar.close()
 
     changed = stats["removed"] > 0
     for g, mkeys in groups.items():
@@ -585,12 +605,17 @@ def derive_light(dark_name, name, inherits, workers=None, embed=None):
             for f in set(os.listdir(dst_ctx)) - want:    # icons the dark theme dropped
                 os.unlink(os.path.join(dst_ctx, f))
                 changed = True
+    bar = Bar(name, len(todo))
     if len(todo) > 4:
-        with cf.ProcessPoolExecutor(max_workers=workers or os.cpu_count()) as ex:
-            list(ex.map(_lighten, todo, chunksize=64))
+        with cf.ProcessPoolExecutor(max_workers=workers or os.cpu_count(), initializer=_die_with_parent) as ex:
+            for _ in ex.map(_lighten, todo, chunksize=64):
+                bar.step()
     else:
         for j in todo:
             _lighten(j)
+            bar.step()
+    if todo:
+        bar.close()
     if embed and base.embed(tdir, embed):
         changed = True
     dirs = [(d, e) for d, e in base.sections(os.path.join(sdir, "index.theme")) if not d.startswith(base.EMBED + "/")]

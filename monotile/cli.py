@@ -267,6 +267,10 @@ def main(argv=None):
     except (RuntimeError, ValueError) as e:
         print(f"monotile: {e}", file=sys.stderr)
         return 1
+    except KeyboardInterrupt:
+        print("\nmonotile: stopped. Icons converted so far are kept; the next run continues from there.",
+              file=sys.stderr)
+        return 130
     return 0
 
 
