@@ -148,6 +148,13 @@ cd monotile
 ./run-monotile watch enable             # keep it updated when apps are installed or removed
 ```
 
+> [!IMPORTANT]
+> **The first `apply` (or `generate`) takes about 5 to 10 minutes. Let it finish.**
+> It draws about 10,000 icons into four themes (about 1.1 GB). A progress bar shows each theme
+> and the time left; before the first bar it spends a moment checking your apps. If you stop it
+> (Ctrl+C), the icons drawn so far are kept and the next run continues from there. Later runs
+> only redraw what changed and take seconds.
+
 To undo: `./run-monotile revert` (back to your previous icon theme) or
 `./run-monotile uninstall --yes` (revert, stop watching and delete the generated theme).
 
