@@ -28,17 +28,17 @@ class MonoSystem extends M.MonoDesklet {
         cr.setLineCap(1);
         for (let [r, pct] of rings) {
             cr.setLineWidth(5 * s);
-            cr.setSourceRGBA(1, 1, 1, 0.08);
+            M.source(cr, M.ink(0.08));
             cr.arc(cx, cy, r * s, 0, 2 * Math.PI);
             cr.stroke();
-            let c = pct >= 90 ? accent : [1, 1, 1];          // red only when nearly full
+            let c = pct >= 90 ? accent : M.ink();          // red only when nearly full
             cr.setSourceRGBA(c[0], c[1], c[2], 1);
             cr.arc(cx, cy, r * s, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * Math.min(pct, 100) / 100);
             cr.stroke();
         }
         let value = { ram: this.ram, cpu: this.cpu, disk: this.disk }[this.center] || 0;
         let label = { ram: "RAM", cpu: "CPU", disk: "DISK" }[this.center] || "RAM";
-        M.text(cr, `${Math.round(value)}`, M.DOT_FONT, 26 * s, M.WHITE, cx, cy - 20 * s, 0.5);
+        M.text(cr, `${Math.round(value)}`, M.DOT_FONT, 26 * s, M.ink(), cx, cy - 20 * s, 0.5);
         M.text(cr, label, M.TEXT_FONT, 9 * s, M.MUTED, cx, cy + 10 * s, 0.5);
     }
 }

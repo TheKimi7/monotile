@@ -53,9 +53,9 @@ class MonoWeather extends M.MonoDesklet {
         M.text(cr, "WEATHER", M.TEXT_FONT, 12 * s, M.MUTED, 18 * s, 16 * s);
         let d = this.data;
         let temp = d ? `${this.units === "F" ? d.F : d.C}°` : "--";
-        M.text(cr, temp, M.DOT_FONT, 44 * s, M.WHITE, 16 * s, 40 * s);
+        M.text(cr, temp, M.DOT_FONT, 44 * s, M.ink(), 16 * s, 40 * s);
         let cond = d ? d.cond : (this.error || "loading");
-        M.text(cr, cond.length > 16 ? cond.slice(0, 15) + "…" : cond, M.TEXT_FONT, 11 * s, [1, 1, 1, 0.85], 18 * s, 94 * s);
+        M.text(cr, cond.length > 16 ? cond.slice(0, 15) + "…" : cond, M.TEXT_FONT, 11 * s, M.ink(0.85), 18 * s, 94 * s);
         if (d && d.place)
             M.text(cr, d.place.toUpperCase().slice(0, 16), M.TEXT_FONT, 10 * s, M.MUTED, 18 * s, 112 * s);
     }

@@ -14,7 +14,7 @@ def resolve_fallback(cfg, save=True):
     so the generated theme never ends up inheriting itself once it is active."""
     if cfg["fallback"]:
         return cfg["fallback"]
-    own = set(theme.variant_names(cfg)) | {cfg["name"]}
+    own = set(theme.variant_names(cfg)) | set(theme.light_names(cfg)) | {cfg["name"]}
     cur = desktop.current_theme()
     fb = cur if cur and cur not in own else None
     if not fb:

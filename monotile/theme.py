@@ -71,6 +71,23 @@ def variant_names(cfg):
     return [variant_name(cfg, s) for s in SHAPE_TITLES]
 
 
+def light_name(cfg, shape):
+    """Light-scheme theme name for a tile shape, e.g. Monotile-Light-Circle."""
+    return f"{cfg['name']}-Light-{SHAPE_TITLES[shape]}"
+
+
+def light_names(cfg):
+    return [light_name(cfg, s) for s in SHAPE_TITLES]
+
+
+def light_fallback(fallback):
+    """The light sibling of a dark fallback theme (Papirus-Dark -> Papirus), if installed."""
+    for suffix in ("-Dark", "-dark"):
+        if fallback.endswith(suffix) and Theme(fallback[:-len(suffix)]).exists:
+            return fallback[:-len(suffix)]
+    return fallback
+
+
 def generate_all(cfg, fallback, dry_run=False, workers=None):
     """Build both themes. Monotile-Circle holds every icon; Monotile-Squircle holds
     only the tile icons (apps, menu categories) and inherits the rest from Circle,
@@ -78,15 +95,21 @@ def generate_all(cfg, fallback, dry_run=False, workers=None):
     circle = dict(cfg, name=variant_name(cfg, "circle"), shape="circle")
     squircle = dict(cfg, name=variant_name(cfg, "squircle"), shape="squircle",
                     contexts=[c for c in cfg["contexts"] if c in TILE_CONTEXTS] or ["apps"])
-    return {
+    out = {
         circle["name"]: generate(circle, fallback, dry_run=dry_run, workers=workers),
         squircle["name"]: generate(squircle, f"{circle['name']},{fallback}", dry_run=dry_run, workers=workers),
     }
+    if not dry_run:
+        lfb = light_fallback(fallback)
+        lc, ls = light_name(cfg, "circle"), light_name(cfg, "squircle")
+        derive_light(circle["name"], lc, lfb, workers=workers)
+        derive_light(squircle["name"], ls, f"{lc},{lfb}", workers=workers)
+    return out
 
 
 def remove_all(cfg):
     """Delete both themes and a legacy single-theme folder from monotile 0.1."""
-    for name in variant_names(cfg) + [cfg["name"]]:
+    for name in variant_names(cfg) + light_names(cfg) + [cfg["name"]]:
         remove(dict(cfg, name=name))
 
 
@@ -452,6 +475,89 @@ def _generate(cfg, fallback, tdir, dry_run, workers):
         update_icon_cache(tdir)
     stats["changed"] = changed
     return stats
+
+
+# ------------------------------------------------------------------ light scheme
+
+# dark tile (30) -> light grey (218), white glyph (242) -> near black (16), greys in between
+_LIGHT_LUT = [max(0, min(255, round(246.6 - 0.953 * v))) for v in range(256)]
+
+
+def _lighten(job):
+    """Worker: write the light-scheme copy of one dark icon (same alpha, tones flipped)."""
+    src, dst = job
+    from PIL import Image
+    im = Image.open(src).convert("RGBA")
+    r, g, b, a = im.split()
+    out = Image.merge("RGBA", [c.point(_LIGHT_LUT) for c in (r, g, b)] + [a])
+    buf = io.BytesIO()
+    out.save(buf, "PNG")
+    C.atomic_write(dst, buf.getvalue(), mode="wb")
+
+
+def derive_light(dark_name, name, inherits, workers=None):
+    """Make the light scheme of a generated theme: every tile and line-art icon with its
+    tones flipped (black symbol on a light-grey tile), folders and file types shared
+    with the dark theme through folder links (Papirus's black folders suit both).
+    Incremental: only icons newer than their light copy are redrawn."""
+    sdir = os.path.join(C.icons_dir(), dark_name)
+    tdir = os.path.join(C.icons_dir(), name)
+    if os.path.isdir(tdir) and not os.path.exists(os.path.join(tdir, MARKER)) and os.listdir(tdir):
+        raise RuntimeError(f"{tdir} exists and was not created by monotile; pick another name")
+    os.makedirs(tdir, exist_ok=True)
+    open(os.path.join(tdir, MARKER), "a").close()
+    todo, changed = [], False
+    for size in sorted(os.listdir(sdir)):
+        sd = os.path.join(sdir, size)
+        if not os.path.isdir(sd):
+            continue
+        for ctx in sorted(os.listdir(sd)):
+            src_ctx, dst_ctx = os.path.join(sd, ctx), os.path.join(tdir, size, ctx)
+            if ctx in FILE_CONTEXTS:
+                target = os.path.relpath(os.path.realpath(src_ctx), os.path.dirname(dst_ctx))
+                if not (os.path.islink(dst_ctx) and os.readlink(dst_ctx) == target):
+                    if os.path.isdir(dst_ctx) and not os.path.islink(dst_ctx):
+                        shutil.rmtree(dst_ctx)
+                    _link(os.path.realpath(src_ctx), dst_ctx)
+                    changed = True
+                continue
+            if os.path.islink(dst_ctx):
+                os.unlink(dst_ctx)
+            os.makedirs(dst_ctx, exist_ok=True)
+            want = set()
+            with os.scandir(src_ctx) as it:
+                for e in it:
+                    want.add(e.name)
+                    dst = os.path.join(dst_ctx, e.name)
+                    if e.is_symlink():                   # aliases stay aliases
+                        link = os.readlink(e.path)
+                        if not (os.path.islink(dst) and os.readlink(dst) == link):
+                            if os.path.lexists(dst):
+                                os.unlink(dst)
+                            os.symlink(link, dst)
+                            changed = True
+                    elif not os.path.exists(dst) or os.lstat(dst).st_mtime_ns < e.stat().st_mtime_ns \
+                            or os.path.islink(dst):
+                        if os.path.islink(dst):
+                            os.unlink(dst)
+                        todo.append((e.path, dst))
+            for f in set(os.listdir(dst_ctx)) - want:    # icons the dark theme dropped
+                os.unlink(os.path.join(dst_ctx, f))
+                changed = True
+    if len(todo) > 4:
+        with cf.ProcessPoolExecutor(max_workers=workers or os.cpu_count()) as ex:
+            list(ex.map(_lighten, todo, chunksize=64))
+    else:
+        for j in todo:
+            _lighten(j)
+    idx = open(os.path.join(sdir, "index.theme"), encoding="utf-8").read()
+    idx = re.sub(r"(?m)^Name=.*$", f"Name={name}", idx, count=1)
+    idx = re.sub(r"(?m)^Inherits=.*$", f"Inherits={inherits},hicolor" if inherits != "hicolor" else "Inherits=hicolor", idx, count=1)
+    idx = re.sub(r"(?m)^Comment=.*$", "Comment=Monochrome icons for light themes, generated by monotile", idx, count=1)
+    C.atomic_write(os.path.join(tdir, "index.theme"), idx)
+    if todo or changed or not os.path.exists(os.path.join(tdir, "icon-theme.cache")):
+        update_icon_cache(tdir)
+    return {"redrawn": len(todo), "changed": bool(todo) or changed}
 
 
 def remove(cfg):

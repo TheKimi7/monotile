@@ -96,6 +96,32 @@ class Generate(FakeDesktop):
         theme.remove(self.cfg)
         self.assertFalse(os.path.exists(self.tdir))
 
+    def test_light_scheme_flips_tones_and_shares_folders(self):
+        self.make_theme("Base", dirs={"48x48/apps": (48, "Applications"), "scalable/apps": ("scalable", "Applications"),
+                                      "48x48/places": (48, "Places")})
+        self.add_icon("Base", "48x48/places", "folder")
+        theme.generate_all(self.cfg, "Base")
+        dark = os.path.join(C.icons_dir(), "Monotile-Circle")
+        light = os.path.join(C.icons_dir(), "Monotile-Light-Circle")
+        from PIL import Image
+        d = Image.open(os.path.join(dark, "48x48", "apps", "calc.png")).convert("RGBA")
+        lt = Image.open(os.path.join(light, "48x48", "apps", "calc.png")).convert("RGBA")
+        self.assertEqual(d.getchannel("A").tobytes(), lt.getchannel("A").tobytes())
+        self.assertGreater(lt.getpixel((24, 4))[0], 200)          # light tile edge
+        self.assertLess(d.getpixel((24, 4))[0], 60)
+        places = os.path.join(light, "48x48", "places")
+        self.assertTrue(os.path.islink(places))
+        self.assertEqual(os.path.realpath(places), os.path.realpath(os.path.join(dark, "48x48", "places")))
+        with open(os.path.join(light, "index.theme")) as f:
+            self.assertIn("Inherits=Base,hicolor", f.read())
+        with open(os.path.join(C.icons_dir(), "Monotile-Light-Squircle", "index.theme")) as f:
+            self.assertIn("Inherits=Monotile-Light-Circle,Base,hicolor", f.read())
+        before = os.stat(os.path.join(light, "48x48", "apps", "calc.png")).st_mtime_ns
+        self.assertEqual(theme.derive_light("Monotile-Circle", "Monotile-Light-Circle", "Base")["redrawn"], 0)
+        self.assertEqual(before, os.stat(os.path.join(light, "48x48", "apps", "calc.png")).st_mtime_ns)
+        theme.remove_all(self.cfg)
+        self.assertFalse(os.path.exists(light))
+
 
 if __name__ == "__main__":
     unittest.main()

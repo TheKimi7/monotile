@@ -43,7 +43,8 @@ where an app or menu category uses it, so launchers and the file manager agree.
 `desklets/` contains five matching desktop widgets as native Cinnamon desklets, so they
 behave like any other desklet: add or remove them with **right-click on the desktop >
 Add Desklets**, drag them anywhere, change them with **right-click > Configure**, and they
-stay visible when you show the desktop.
+stay visible when you show the desktop. With a light desktop theme (one whose name contains
+"Light", such as DotStuff-Light) they switch to black ink on white cards by themselves.
 
 | Desklet | Shows | Options |
 |---|---|---|
@@ -144,7 +145,7 @@ You can also install it with `pipx install .` and run `monotile` instead of `./r
 | Command | What it does |
 |---|---|
 | `preview` | Renders a before/after contact sheet of your apps. Writes only the image. |
-| `generate` | Creates or updates two themes in `~/.local/share/icons`: **Monotile-Circle** (every icon) and **Monotile-Squircle** (only the app and menu tiles; inherits the rest from Monotile-Circle, so it costs seconds and a few MB). Both show up in your desktop's icon theme list. Only changed icons are reconverted (in parallel; names that share one image are converted once and symlinked); `--dry-run` reports without writing. |
+| `generate` | Creates or updates two themes in `~/.local/share/icons`: **Monotile-Circle** (every icon) and **Monotile-Squircle** (only the app and menu tiles; inherits the rest from Monotile-Circle, so it costs seconds and a few MB). It also derives **Monotile-Light-Circle** and **Monotile-Light-Squircle** for light desktop themes: the same icons as a black symbol on a light-grey tile, with folders and file types shared with the dark themes (they inherit Papirus instead of Papirus-Dark). All four show up in your desktop's icon theme list. Only changed icons are reconverted (in parallel; names that share one image are converted once and symlinked); `--dry-run` reports without writing. |
 | `apply` | Generates if needed, then sets Monotile-Circle or, with `--shape squircle`, Monotile-Squircle. Your previous theme is saved once. |
 | `revert` | Restores the icon theme you had before `apply`. |
 | `status` | Shows what is generated, active and watched. |

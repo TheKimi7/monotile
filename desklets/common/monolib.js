@@ -9,11 +9,34 @@ const Pango = imports.gi.Pango;
 var DOT_FONT = "Ndot 57";
 var TEXT_FONT = "JetBrains Mono";
 
-// Panacea / Nothing card: near-black, hairline border, generous radius
+// Light or dark follows the desktop theme: a Cinnamon theme whose name contains
+// "Light" (DotStuff-Light) gets black ink on white cards, anything else white on black.
+var scheme = { light: false };
+
+function readScheme() {
+    try {
+        let name = new Gio.Settings({ schema_id: "org.cinnamon.theme" }).get_string("name");
+        scheme.light = /light/i.test(name);
+    } catch (e) {
+        scheme.light = false;
+    }
+    return scheme.light;
+}
+readScheme();
+
+// ink colour for text, dots and rings at the given opacity
+function ink(alpha) {
+    let v = scheme.light ? 0 : 1;
+    return [v, v, v, alpha === undefined ? 1 : alpha];
+}
+
+// Panacea / Nothing card: near-black (or white), hairline border, generous radius
 function cardStyle(scale, opacity) {
     let a = Math.max(0, Math.min(100, opacity)) / 100;
-    return `background-color: rgba(23,23,23,${(0.96 * a).toFixed(3)});` +
-        `border: 1px solid rgba(255,255,255,${(0.06 * a).toFixed(3)});` +
+    let bg = scheme.light ? "255,255,255" : "23,23,23";
+    let line = scheme.light ? "0,0,0" : "255,255,255";
+    return `background-color: rgba(${bg},${(0.96 * a).toFixed(3)});` +
+        `border: 1px solid rgba(${line},${((scheme.light ? 0.08 : 0.06) * a).toFixed(3)});` +
         `border-radius: ${Math.round(22 * scale)}px;`;
 }
 
@@ -62,13 +85,16 @@ function text(cr, str, font, px, rgba, x, y, align) {
     return [w, h];
 }
 
-function dot(cr, x, y, r, rgba) {
+function source(cr, rgba) {
     cr.setSourceRGBA(rgba[0], rgba[1], rgba[2], rgba.length > 3 ? rgba[3] : 1);
+}
+
+function dot(cr, x, y, r, rgba) {
+    source(cr, rgba);
     cr.arc(x, y, r, 0, 2 * Math.PI);
     cr.fill();
 }
 
-var WHITE = [1, 1, 1, 1];
 var MUTED = [0.53, 0.53, 0.53, 1];
 
 // Timer helpers that are safe to clear twice.
@@ -139,6 +165,11 @@ var MonoDesklet = class MonoDesklet extends Desklet.Desklet {
         this.settings = new Settings.DeskletSettings(this, metadata.uuid, deskletId);
         for (let key of ["scale", "opacity", "accent"].concat(keys || []))
             this.settings.bind(key, key.replace(/-/g, "_"), () => this._rebuild());
+        this._themeSettings = new Gio.Settings({ schema_id: "org.cinnamon.theme" });
+        this._themeSignal = this._themeSettings.connect("changed::name", () => {
+            readScheme();
+            this._rebuild();
+        });
         this._rebuild();
     }
 
@@ -165,6 +196,9 @@ var MonoDesklet = class MonoDesklet extends Desklet.Desklet {
 
     on_desklet_removed() {
         this._timer = clear(this._timer);
+        if (this._themeSignal)
+            this._themeSettings.disconnect(this._themeSignal);
+        this._themeSignal = 0;
         this.onRemoved();
     }
 

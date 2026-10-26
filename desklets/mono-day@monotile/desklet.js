@@ -28,11 +28,11 @@ class MonoDay extends M.MonoDesklet {
             title = "DAY"; sub = `${Math.floor((1440 - mins) / 60)}h ${(1440 - mins) % 60}m left`;
         }
         M.text(cr, title, M.TEXT_FONT, 12 * s, M.MUTED, 18 * s, 14 * s);
-        M.text(cr, `${pct}%`, M.DOT_FONT, 18 * s, M.WHITE, w - 18 * s, 10 * s, 1);
+        M.text(cr, `${pct}%`, M.DOT_FONT, 18 * s, M.ink(), w - 18 * s, 10 * s, 1);
         let left = 22 * s, right = w - 22 * s, step = (right - left) / (n - 1);
         let radius = (n === 24 ? 4.2 : 6) * s;
         for (let i = 0; i < n; i++) {
-            let c = i < cur ? M.WHITE : i === cur ? this.accentRGB : [1, 1, 1, 0.15];
+            let c = i < cur ? M.ink() : i === cur ? this.accentRGB : M.ink(0.15);
             M.dot(cr, left + i * step, 52 * s, radius, c);
         }
         M.text(cr, sub, M.TEXT_FONT, 10 * s, M.MUTED, 18 * s, 66 * s);
