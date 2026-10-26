@@ -129,7 +129,7 @@ sudo pacman -S python-pillow python-gobject gdk-pixbuf2 librsvg gtk-update-icon-
 No installation needed; run it straight from a clone:
 
 ```sh
-git clone https://github.com/<you>/monotile.git
+git clone https://github.com/TheKimi7/monotile.git
 cd monotile
 ./run-monotile preview -o preview.png   # before/after sheet of your apps; changes nothing
 ./run-monotile apply                    # generate both themes and switch to Monotile-Circle
