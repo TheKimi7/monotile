@@ -10,6 +10,7 @@ import re
 from dataclasses import dataclass
 
 ICON_EXTS = (".svg", ".png", ".xpm")
+BUNDLED = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "base")
 SAFE_NAME = re.compile(r"^[A-Za-z0-9._+@-]+$")
 
 
@@ -31,6 +32,7 @@ def data_dirs():
 def icon_base_dirs():
     out = [os.path.expanduser("~/.icons")]
     out += [os.path.join(d, "icons") for d in data_dirs()]
+    out.append(BUNDLED)                   # monotile's own base themes, usable before they are installed
     return [d for d in out if os.path.isdir(d)]
 
 

@@ -96,6 +96,14 @@ class Generate(FakeDesktop):
         theme.remove(self.cfg)
         self.assertFalse(os.path.exists(self.tdir))
 
+    def test_light_fallback_prefers_light_panel_icons(self):
+        self.make_theme("Pap")
+        self.make_theme("Pap-Dark")
+        self.assertEqual(theme.light_fallback("Pap-Dark"), "Pap")
+        self.make_theme("Pap-Light")
+        self.assertEqual(theme.light_fallback("Pap-Dark"), "Pap-Light,Pap")
+        self.assertEqual(theme.light_fallback("Base"), "Base")
+
     def test_light_scheme_flips_tones_and_shares_folders(self):
         self.make_theme("Base", dirs={"48x48/apps": (48, "Applications"), "scalable/apps": ("scalable", "Applications"),
                                       "48x48/places": (48, "Places")})

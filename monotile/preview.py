@@ -15,7 +15,7 @@ def _font(size):
     return ImageFont.load_default()
 
 
-def contact_sheet(items, convert_one, columns=10, bg=(0, 0, 0)):
+def contact_sheet(items, convert_one, columns=10, bg=(0, 0, 0), label_fg=(170, 170, 170)):
     """items: list of (label, icon_path); convert_one(path, size) -> RGBA image.
     Returns (sheet image, failed count)."""
     rows = (len(items) + columns - 1) // columns
@@ -36,5 +36,5 @@ def contact_sheet(items, convert_one, columns=10, bg=(0, 0, 0)):
         text = label if len(label) <= 18 else label[:17] + "…"
         tw = d.textlength(text, font=font)
         d.text(((i % columns) * CELL_W + (CELL_W - tw) / 2, y + 2 * ICON + 14), text,
-               fill=(170, 170, 170), font=font)
+               fill=label_fg, font=font)
     return sheet, failed

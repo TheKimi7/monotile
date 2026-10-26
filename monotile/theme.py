@@ -23,6 +23,7 @@ import re
 import shutil
 import subprocess
 
+from . import base
 from . import config as C
 from . import poster
 from .iconfile import render
@@ -50,8 +51,8 @@ KEEP_MONO = ("status", "actions", "animations")
 
 CONTEXT_NAMES = [c for c, _, _ in CONTEXTS]
 
-# Papirus ships every folder in ~25 colours; only the default set is ever used
-# unless the user recolours folders, so the variants are not converted.
+# Folder colour variants (folder-red-music...), as in Papirus: only the default and black
+# sets are used, the others show the matching black folder.
 _COLOUR_VARIANT = re.compile(
     r"^(folder|user)-(adwaita|black|blue|bluegrey|breeze|brown|carmine|cyan|darkcyan|deeporange|"
     r"green|grey|indigo|magenta|nordic|orange|palebrown|paleorange|pink|red|teal|violet|white|"
@@ -81,11 +82,16 @@ def light_names(cfg):
 
 
 def light_fallback(fallback):
-    """The light sibling of a dark fallback theme (Papirus-Dark -> Papirus), if installed."""
+    """Fallback for the light themes: Monotile-Base-Dark -> Monotile-Base-Light (dark panel and
+    tray icons). Another X-Dark fallback becomes "X-Light,X" or X, whichever exists."""
+    base_name = fallback
     for suffix in ("-Dark", "-dark"):
         if fallback.endswith(suffix) and Theme(fallback[:-len(suffix)]).exists:
-            return fallback[:-len(suffix)]
-    return fallback
+            base_name = fallback[:-len(suffix)]
+    light = f"{base_name}-Light"
+    if not Theme(light).exists:
+        return base_name
+    return light if base_name == base.SOURCE else f"{light},{base_name}"
 
 
 def generate_all(cfg, fallback, dry_run=False, workers=None):
@@ -95,6 +101,8 @@ def generate_all(cfg, fallback, dry_run=False, workers=None):
     circle = dict(cfg, name=variant_name(cfg, "circle"), shape="circle")
     squircle = dict(cfg, name=variant_name(cfg, "squircle"), shape="squircle",
                     contexts=[c for c in cfg["contexts"] if c in TILE_CONTEXTS] or ["apps"])
+    if not dry_run and any(n in base.NAMES for n in (cfg["source"] or base.SOURCE, *fallback.split(","))):
+        base.install()
     out = {
         circle["name"]: generate(circle, fallback, dry_run=dry_run, workers=workers),
         squircle["name"]: generate(squircle, f"{circle['name']},{fallback}", dry_run=dry_run, workers=workers),
@@ -111,11 +119,12 @@ def remove_all(cfg):
     """Delete both themes and a legacy single-theme folder from monotile 0.1."""
     for name in variant_names(cfg) + light_names(cfg) + [cfg["name"]]:
         remove(dict(cfg, name=name))
+    base.remove()
 
 
 def black_variant(places_index, name, path):
-    """Papirus ships every folder in a black colour variant (folder-black-music,
-    user-black-home...): use it for the "black" file style when there is one."""
+    """Every folder has a black colour variant (folder-black-music, user-black-home...):
+    use it for the "black" file style when there is one."""
     m = re.match(r"^(folder|user)(-.*)?$", name)
     if m:
         alt = places_index.get(f"{m.group(1)}-black{m.group(2) or ''}")
@@ -125,10 +134,7 @@ def black_variant(places_index, name, path):
 
 
 def default_source(name):
-    for t in ("Papirus", "Papirus-Dark"):
-        if t != name and Theme(t).exists:
-            return t
-    return "hicolor"
+    return base.SOURCE
 
 
 def style_of(cfg, ctx):
@@ -498,7 +504,7 @@ def _lighten(job):
 def derive_light(dark_name, name, inherits, workers=None):
     """Make the light scheme of a generated theme: every tile and line-art icon with its
     tones flipped (black symbol on a light-grey tile), folders and file types shared
-    with the dark theme through folder links (Papirus's black folders suit both).
+    with the dark theme through folder links (the black folders suit both).
     Incremental: only icons newer than their light copy are redrawn."""
     sdir = os.path.join(C.icons_dir(), dark_name)
     tdir = os.path.join(C.icons_dir(), name)

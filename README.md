@@ -3,8 +3,9 @@
 **Nothing-inspired monochrome icons for every app on your Linux desktop.**
 
 monotile turns your desktop's icons into flat white monochrome icons in the spirit of
-Nothing OS: app and menu icons on a dark circle or squircle, and folders, file types,
-devices and status icons as white line art in their own shape. It writes the result as
+Nothing OS: app and menu icons on a dark circle or squircle, devices and status icons as
+white line art in their own shape, folders black and file types in
+greyscale. monotile ships the icons it starts from, so no other icon theme is needed. A light version (black symbols on light-grey tiles) is made alongside. It writes the result as
 a normal icon theme, so your desktop shows it like any other theme, and it can keep
 that theme up to date as you install and remove apps.
 
@@ -15,14 +16,16 @@ that theme up to date as you install and remove apps.
 ![30 common apps: original above, monotile below (squircle)](docs/demo-squircle.png)
 </details>
 
-![Folders, file types and devices keep their own shape](docs/demo-system.png)
+![Light scheme: black symbols on light-grey tiles (Monotile-Light-Circle)](docs/demo-light.png)
+
+![Folders black, file types greyscale, devices white line art](docs/demo-system.png)
 
 ### What gets converted
 
 | Icons | Style |
 |---|---|
 | Every app-style icon of the source theme (not only installed apps), application-menu categories, session icons (shut down, lock, log out, suspend…), plus your installed apps' own icons | white stencil on a dark circle or squircle |
-| Folders | the source theme's black folder variants (Papirus `folder-black-…`), greyscale where none exists |
+| Folders | the black folder variants (`folder-black-…`), greyscale where none exists |
 | File types | the source icons exactly as drawn, in greyscale |
 | Devices, emblems and emoji faces | white stencil in the icon's own shape (no tile) |
 | Status, action and animation icons that are coloured | white stencil in their own shape |
@@ -31,7 +34,7 @@ that theme up to date as you install and remove apps.
 Every size folder is declared scalable over a range, so icons follow any size you pick
 (file manager zoom, desktop icon size, panel size) instead of snapping to fixed sizes.
 
-Papirus's extra folder colour variants (`folder-red-…`) are skipped; the default folders are converted.
+Folder colour variants (`folder-red-…`) show the matching black folder.
 A name that the source theme draws as a folder, file type or device keeps that native look even
 where an app or menu category uses it, so launchers and the file manager agree.
 
@@ -101,25 +104,24 @@ The result is deterministic: the same icon and settings always give byte-identic
 - Linux with a freedesktop.org desktop (see [compatibility](#compatibility))
 - Python 3.9+, Pillow, PyGObject with GdkPixbuf and the librsvg SVG loader
 - Optional: `gtk-update-icon-cache` (recommended), systemd user session (for `watch`)
-- A colourful source theme. [Papirus](https://github.com/PapirusDevelopmentTeam/papirus-icon-theme)
-  gives the best results and is used automatically when installed.
+- No icon theme: monotile includes its own (`base/`, see [Built-in icons](#built-in-icons)).
 
 **Debian / Ubuntu / Linux Mint**
 
 ```sh
-sudo apt install python3-pil python3-gi gir1.2-gdkpixbuf-2.0 librsvg2-common gtk-update-icon-cache papirus-icon-theme
+sudo apt install python3-pil python3-gi gir1.2-gdkpixbuf-2.0 librsvg2-common gtk-update-icon-cache
 ```
 
 **Fedora** (untested)
 
 ```sh
-sudo dnf install python3-pillow python3-gobject gdk-pixbuf2 librsvg2 gtk-update-icon-cache papirus-icon-theme
+sudo dnf install python3-pillow python3-gobject gdk-pixbuf2 librsvg2 gtk-update-icon-cache
 ```
 
 **Arch** (untested)
 
 ```sh
-sudo pacman -S python-pillow python-gobject gdk-pixbuf2 librsvg gtk-update-icon-cache papirus-icon-theme
+sudo pacman -S python-pillow python-gobject gdk-pixbuf2 librsvg gtk-update-icon-cache
 ```
 
 ## Quick start
@@ -145,7 +147,7 @@ You can also install it with `pipx install .` and run `monotile` instead of `./r
 | Command | What it does |
 |---|---|
 | `preview` | Renders a before/after contact sheet of your apps. Writes only the image. |
-| `generate` | Creates or updates two themes in `~/.local/share/icons`: **Monotile-Circle** (every icon) and **Monotile-Squircle** (only the app and menu tiles; inherits the rest from Monotile-Circle, so it costs seconds and a few MB). It also derives **Monotile-Light-Circle** and **Monotile-Light-Squircle** for light desktop themes: the same icons as a black symbol on a light-grey tile, with folders and file types shared with the dark themes (they inherit Papirus instead of Papirus-Dark). All four show up in your desktop's icon theme list. Only changed icons are reconverted (in parallel; names that share one image are converted once and symlinked); `--dry-run` reports without writing. |
+| `generate` | Creates or updates two themes in `~/.local/share/icons`: **Monotile-Circle** (every icon) and **Monotile-Squircle** (only the app and menu tiles; inherits the rest from Monotile-Circle, so it costs seconds and a few MB). It also derives **Monotile-Light-Circle** and **Monotile-Light-Squircle** for light desktop themes: the same icons as a black symbol on a light-grey tile, with folders and file types shared with the dark themes (they inherit Monotile-Base-Light instead of Monotile-Base-Dark). All four show up in your desktop's icon theme list. Only changed icons are reconverted (in parallel; names that share one image are converted once and symlinked); `--dry-run` reports without writing. |
 | `apply` | Generates if needed, then sets Monotile-Circle or, with `--shape squircle`, Monotile-Squircle. Your previous theme is saved once. |
 | `revert` | Restores the icon theme you had before `apply`. |
 | `status` | Shows what is generated, active and watched. |
@@ -160,7 +162,7 @@ Style options work with `preview`, `generate` and `apply`, and are remembered:
 | `--shape` | which theme `apply` activates: `circle`, `squircle` | `circle` |
 | `--file-style` | folders and file types: `black` (black folders, greyscale files), `grey` (all greyscale) or `native` (white line art) | `black` |
 | `--tones` | `2` white stencil · `3` large grey bodies filled grey · `4` white / light grey / mid grey | `2` |
-| `--source` | icon theme to read app icons from | Papirus if installed |
+| `--source` | icon theme to read app icons from | Monotile-Base (built in) |
 | `--fallback` | icon theme for everything that is not an app icon (folders, file types…) | your icon theme at first run |
 | `--name` | name prefix of the generated themes | `Monotile` |
 | `--contexts` (generate) | which kinds to convert: `apps,categories,places,mimetypes,devices,status,emblems,actions` | all |
@@ -243,9 +245,25 @@ python3 docs/make_demo.py                            # rebuild the README images
 The tests never touch your real icon theme or settings: they run against a fake desktop in a
 temporary directory and an in-memory settings backend.
 
+## Built-in icons
+
+`base/` is a trimmed copy of the [Papirus icon theme](https://github.com/PapirusDevelopmentTeam/papirus-icon-theme)
+(version in `base/VERSION`), so monotile does not depend on any installed theme. `generate`
+installs it as three hidden themes:
+
+| Theme | Contents |
+|---|---|
+| Monotile-Base | what monotile converts (64 px apps, devices, file types, default and black folders) plus small toolbar, status and symbolic icons |
+| Monotile-Base-Dark | light toolbar, panel and tray icons; what the dark themes inherit |
+| Monotile-Base-Light | dark panel and tray icons; what the light themes inherit |
+
+Only one size of each converted icon is kept (monotile renders every size from SVG) and folder
+colour variants other than black are left out: 33 MB instead of Papirus's 250 MB. Rebuild it
+from a Papirus install with `python3 tools/import_papirus.py /usr/share/icons <version>`.
+
 ## Credits and licence
 
-- App icons used as input and in the demo images: [Papirus icon theme](https://github.com/PapirusDevelopmentTeam/papirus-icon-theme), GPL-3.0.
+- Built-in icons (`base/`) from the [Papirus icon theme](https://github.com/PapirusDevelopmentTeam/papirus-icon-theme) by the Papirus Development Team, GPL-3.0 (`base/PAPIRUS-COPYRIGHT`).
 - Inspired by the monochrome icon look of Nothing OS.
 
 monotile is free software under the [GNU General Public License v3.0 or later](LICENSE).

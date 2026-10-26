@@ -8,8 +8,8 @@ THEME_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._+-]{0,63}$")
 
 DEFAULTS = {
     "name": "Monotile",            # icon theme name (folder under ~/.local/share/icons)
-    "source": None,                # theme to read app icons from; None = auto (Papirus if present)
-    "fallback": None,              # theme to inherit everything else from; None = current theme at first run
+    "source": None,                # theme to read app icons from; None = monotile's own Monotile-Base
+    "fallback": None,              # theme to inherit everything else from; None = Monotile-Base-Dark
     "shape": "circle",             # circle | squircle
     "tones": 2,                    # 2 | 3 | 4
     "file_style": "black",         # folders and file types: black | grey | native (white line art)
@@ -78,6 +78,8 @@ def validate(cfg):
     if not isinstance(out["name"], str) or not THEME_NAME_RE.match(out["name"]):
         raise ValueError("name: letters, digits, space . _ + - only (max 64)")
     for key in ("source", "fallback"):
+        if isinstance(out[key], str) and out[key].startswith("Papirus"):
+            out[key] = None                  # older versions picked Papirus; monotile now ships its own
         v = out[key]
         if v is not None and (not isinstance(v, str) or not THEME_NAME_RE.match(v)):
             raise ValueError(f"{key}: not a valid icon theme name")
