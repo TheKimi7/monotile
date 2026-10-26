@@ -10,8 +10,8 @@ from . import base, desktop, theme, watch
 
 
 def resolve_fallback(cfg, save=True):
-    """The theme everything not converted is inherited from: monotile's own Monotile-Base-Dark
-    unless another one was chosen with --fallback."""
+    """The theme everything not converted comes from: base.DARK stands for monotile's built-in
+    icons (carried inside the generated themes) unless another theme was chosen with --fallback."""
     return cfg["fallback"] or base.DARK
 
 
@@ -73,7 +73,7 @@ def _migrate_legacy(cfg):
 
 
 def _adopt_legacy(cfg):
-    """Seed Monotile-Circle from a monotile 0.1 single theme (hard links, so it is
+    """Seed Monotile-Circle-Dark from a monotile 0.1 single theme (hard links, so it is
     instant and uses no extra space): its folder/file/device/status icons are
     identical, and only the tile icons get redone."""
     import shutil
@@ -108,8 +108,14 @@ def cmd_generate(a):
     if not a.dry_run:
         _migrate_legacy(cfg)
     active = desktop.current_theme()
-    if a.refresh and not a.dry_run and active in results and any(s["changed"] for s in results.values()):
-        desktop.refresh(active, fallback)
+    renamed = theme.legacy_names(cfg).get(active)
+    if renamed and not a.dry_run:                       # the desktop used a theme under its old name
+        desktop.apply(renamed)
+        print(f"icon theme {active} is now called {renamed}")
+        return
+    ours = set(results) | set(theme.light_names(cfg))
+    if a.refresh and not a.dry_run and active in ours and any(s["changed"] for s in results.values()):
+        desktop.refresh(active, "hicolor" if fallback == base.DARK else fallback)
 
 
 def cmd_apply(a):
@@ -214,8 +220,8 @@ def build_parser():
     style.add_argument("--file-style", dest="file_style", choices=("black", "grey", "native"),
                        help="folders and file types: black = the source theme's black folders and "
                             "greyscale files (default), grey = everything greyscale, native = white line art")
-    style.add_argument("--source", help="icon theme to read app icons from (default: monotile's own Monotile-Base)")
-    style.add_argument("--fallback", help="icon theme to inherit everything else from (default: monotile's own Monotile-Base-Dark)")
+    style.add_argument("--source", help="icon theme to read app icons from (default: monotile's built-in icons)")
+    style.add_argument("--fallback", help="icon theme to inherit everything else from (default: monotile's built-in icons)")
     style.add_argument("--name", help="name of the generated theme (default: Monotile)")
 
     pv = sub.add_parser("preview", parents=[style], help="render a before/after contact sheet (changes nothing)")

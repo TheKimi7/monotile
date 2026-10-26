@@ -134,28 +134,37 @@ class ThemePair(FakeDesktop):
 
     def test_circle_is_full_and_squircle_only_tiles(self):
         out = theme.generate_all(self.cfg, "Src", workers=1)
-        self.assertEqual(sorted(out), ["Monotile-Circle", "Monotile-Squircle"])
-        self.assertTrue(os.path.exists(self.path("Monotile-Circle", "places", "folder")))
-        self.assertTrue(os.path.exists(self.path("Monotile-Squircle", "apps", "calc")))
-        self.assertFalse(os.path.exists(self.path("Monotile-Squircle", "places", "folder")))
-        with open(os.path.join(C.icons_dir(), "Monotile-Squircle", "index.theme")) as f:
-            self.assertIn("Inherits=Monotile-Circle,Src,hicolor", f.read())
+        self.assertEqual(sorted(out), ["Monotile-Circle-Dark", "Monotile-Squircle-Dark"])
+        self.assertTrue(os.path.exists(self.path("Monotile-Circle-Dark", "places", "folder")))
+        self.assertTrue(os.path.exists(self.path("Monotile-Squircle-Dark", "apps", "calc")))
+        self.assertFalse(os.path.exists(self.path("Monotile-Squircle-Dark", "places", "folder")))
+        with open(os.path.join(C.icons_dir(), "Monotile-Squircle-Dark", "index.theme")) as f:
+            self.assertIn("Inherits=Monotile-Circle-Dark,Src,hicolor", f.read())
 
     def test_shapes_differ(self):
         from PIL import Image
         theme.generate_all(self.cfg, "Src", workers=1)
         corner = lambda t: Image.open(self.path(t, "apps", "calc")).convert("RGBA").getpixel((5, 5))[3]
-        self.assertLess(corner("Monotile-Circle"), corner("Monotile-Squircle"))   # squircle fills corners more
+        self.assertLess(corner("Monotile-Circle-Dark"), corner("Monotile-Squircle-Dark"))   # squircle fills corners more
+
+    def test_old_theme_names_are_replaced(self):
+        old = os.path.join(C.icons_dir(), "Monotile-Circle")
+        os.makedirs(old)
+        open(os.path.join(old, theme.MARKER), "w").close()
+        theme.generate_all(self.cfg, "Src")
+        self.assertFalse(os.path.exists(old))
+        self.assertTrue(os.path.exists(os.path.join(C.icons_dir(), "Monotile-Circle-Dark", "index.theme")))
+        self.assertEqual(theme.legacy_names(self.cfg)["Monotile-Light-Squircle"], "Monotile-Squircle-Light")
 
     def test_variant_names_rejected_as_fallback(self):
         with self.assertRaises(ValueError):
-            C.validate({"fallback": "Monotile-Circle"})
+            C.validate({"fallback": "Monotile-Circle-Dark"})
 
     def test_remove_all(self):
         theme.generate_all(self.cfg, "Src", workers=1)
         theme.remove_all(self.cfg)
-        self.assertFalse(os.path.exists(os.path.join(C.icons_dir(), "Monotile-Circle")))
-        self.assertFalse(os.path.exists(os.path.join(C.icons_dir(), "Monotile-Squircle")))
+        self.assertFalse(os.path.exists(os.path.join(C.icons_dir(), "Monotile-Circle-Dark")))
+        self.assertFalse(os.path.exists(os.path.join(C.icons_dir(), "Monotile-Squircle-Dark")))
 
 
 class AliasRepair(FakeDesktop):
@@ -183,9 +192,9 @@ class NativeNamesStayNative(FakeDesktop):
         self.add_app("files", "folder")
         cfg = C.validate({"source": "Nv", "fallback": "Nv", "sizes": [48]})
         theme.generate_all(cfg, "Nv", workers=1)
-        for t in ("Monotile-Circle", "Monotile-Squircle"):
+        for t in ("Monotile-Circle-Dark", "Monotile-Squircle-Dark"):
             self.assertFalse(os.path.exists(os.path.join(C.icons_dir(), t, "48x48", "apps", "folder.png")))
-        self.assertTrue(os.path.exists(os.path.join(C.icons_dir(), "Monotile-Circle", "48x48", "places", "folder.png")))
+        self.assertTrue(os.path.exists(os.path.join(C.icons_dir(), "Monotile-Circle-Dark", "48x48", "places", "folder.png")))
 
 
 class DryRunWritesNothing(FakeDesktop):

@@ -60,12 +60,13 @@ _COLOUR_VARIANT = re.compile(
 
 
 SHAPE_TITLES = {"circle": "Circle", "squircle": "Squircle"}
+MODE_TITLES = {"dark": "Dark", "light": "Light"}
 TILE_CONTEXTS = [c for c, _, st in CONTEXTS if st == "tile"]
 
 
-def variant_name(cfg, shape):
-    """Installed theme name for a tile shape, e.g. Monotile-Squircle."""
-    return f"{cfg['name']}-{SHAPE_TITLES[shape]}"
+def variant_name(cfg, shape, mode="dark"):
+    """Installed theme name, e.g. Monotile-Squircle-Dark or Monotile-Circle-Light."""
+    return f"{cfg['name']}-{SHAPE_TITLES[shape]}-{MODE_TITLES[mode]}"
 
 
 def variant_names(cfg):
@@ -73,53 +74,72 @@ def variant_names(cfg):
 
 
 def light_name(cfg, shape):
-    """Light-scheme theme name for a tile shape, e.g. Monotile-Light-Circle."""
-    return f"{cfg['name']}-Light-{SHAPE_TITLES[shape]}"
+    return variant_name(cfg, shape, "light")
 
 
 def light_names(cfg):
     return [light_name(cfg, s) for s in SHAPE_TITLES]
 
 
+def legacy_names(cfg):
+    """Names used before -Dark/-Light (Monotile-Circle, Monotile-Light-Squircle...) -> new name."""
+    n = cfg["name"]
+    out = {}
+    for shape, title in SHAPE_TITLES.items():
+        out[f"{n}-{title}"] = variant_name(cfg, shape)
+        out[f"{n}-Light-{title}"] = light_name(cfg, shape)
+    return out
+
+
+def remove_legacy_names(cfg):
+    """Delete themes monotile made under the old names, and their manifests."""
+    for old in legacy_names(cfg):
+        remove(dict(cfg, name=old))
+
+
 def light_fallback(fallback):
-    """Fallback for the light themes: Monotile-Base-Dark -> Monotile-Base-Light (dark panel and
-    tray icons). Another X-Dark fallback becomes "X-Light,X" or X, whichever exists."""
+    """Fallback for the light themes when another theme is used instead of the built-in
+    icons: X-Dark -> "X-Light,X" (Papirus-Light has dark panel and tray icons but inherits
+    only breeze) or X, whichever exists."""
     base_name = fallback
     for suffix in ("-Dark", "-dark"):
         if fallback.endswith(suffix) and Theme(fallback[:-len(suffix)]).exists:
             base_name = fallback[:-len(suffix)]
-    light = f"{base_name}-Light"
-    if not Theme(light).exists:
-        return base_name
-    return light if base_name == base.SOURCE else f"{light},{base_name}"
+    return f"{base_name}-Light,{base_name}" if Theme(f"{base_name}-Light").exists else base_name
 
 
 def generate_all(cfg, fallback, dry_run=False, workers=None):
-    """Build both themes. Monotile-Circle holds every icon; Monotile-Squircle holds
-    only the tile icons (apps, menu categories) and inherits the rest from Circle,
-    so the second shape costs a few seconds and a few MB instead of a full copy."""
-    circle = dict(cfg, name=variant_name(cfg, "circle"), shape="circle")
-    squircle = dict(cfg, name=variant_name(cfg, "squircle"), shape="squircle",
+    """Build the themes. Monotile-Circle-Dark holds every icon; Monotile-Squircle-Dark holds
+    only the tile icons (apps, menu categories) and inherits the rest from Circle-Dark, so the
+    second shape costs a few seconds and a few MB instead of a full copy. Monotile-Circle-Light
+    and Monotile-Squircle-Light are the same for light desktops.
+
+    With the default fallback the built-in base icons are carried inside Circle-Dark and
+    Circle-Light; any other fallback theme is inherited instead."""
+    embedded = fallback == base.DARK
+    circle = dict(cfg, name=variant_name(cfg, "circle"), shape="circle", embed="dark" if embedded else None)
+    squircle = dict(cfg, name=variant_name(cfg, "squircle"), shape="squircle", embed=None,
                     contexts=[c for c in cfg["contexts"] if c in TILE_CONTEXTS] or ["apps"])
-    if not dry_run and any(n in base.NAMES for n in (cfg["source"] or base.SOURCE, *fallback.split(","))):
-        base.install()
     out = {
-        circle["name"]: generate(circle, fallback, dry_run=dry_run, workers=workers),
-        squircle["name"]: generate(squircle, f"{circle['name']},{fallback}", dry_run=dry_run, workers=workers),
+        circle["name"]: generate(circle, "hicolor" if embedded else fallback, dry_run=dry_run, workers=workers),
+        squircle["name"]: generate(squircle, circle["name"] if embedded else f"{circle['name']},{fallback}",
+                                   dry_run=dry_run, workers=workers),
     }
     if not dry_run:
-        lfb = light_fallback(fallback)
+        base.remove_legacy()
+        remove_legacy_names(cfg)
         lc, ls = light_name(cfg, "circle"), light_name(cfg, "squircle")
-        derive_light(circle["name"], lc, lfb, workers=workers)
-        derive_light(squircle["name"], ls, f"{lc},{lfb}", workers=workers)
+        lfb = "hicolor" if embedded else light_fallback(fallback)
+        derive_light(circle["name"], lc, lfb, workers=workers, embed="light" if embedded else None)
+        derive_light(squircle["name"], ls, lc if embedded else f"{lc},{lfb}", workers=workers)
     return out
 
 
 def remove_all(cfg):
     """Delete both themes and a legacy single-theme folder from monotile 0.1."""
-    for name in variant_names(cfg) + light_names(cfg) + [cfg["name"]]:
+    for name in variant_names(cfg) + light_names(cfg) + list(legacy_names(cfg)) + [cfg["name"]]:
         remove(dict(cfg, name=name))
-    base.remove()
+    base.remove_legacy()
 
 
 def black_variant(places_index, name, path):
@@ -290,7 +310,9 @@ def _link(target, link):
 def write_index(cfg, tdir, fallback, used_contexts):
     """Every size folder is Scalable over the range above the next smaller size, and the
     largest one up to 512 px, so a request for any size picks the nearest larger image
-    and the toolkit scales it (Fixed folders made 150-400 px requests snap to 256)."""
+    and the toolkit scales it (Fixed folders made 150-400 px requests snap to 256).
+    Built-in base icons, if the theme carries them, are listed last. Returns True if the
+    index changed."""
     sizes = sorted(cfg["sizes"])
     ranges = {s: (8 if i == 0 else sizes[i - 1] + 1, 512 if i == len(sizes) - 1 else s)
               for i, s in enumerate(sizes)}
@@ -298,16 +320,26 @@ def write_index(cfg, tdir, fallback, used_contexts):
     for s in sizes:
         for ctx, fd_context, _ in CONTEXTS:
             if ctx in used_contexts:
-                dirs.append((f"{s}x{s}/{ctx}", s, fd_context))
-    lines = ["[Icon Theme]", f"Name={cfg['name']}",
-             "Comment=Monochrome icons generated by monotile",
-             f"Inherits={fallback},hicolor" if fallback != "hicolor" else "Inherits=hicolor",
-             "Directories=" + ",".join(d for d, _, _ in dirs), ""]
-    for d, s, fd_context in dirs:
-        lo, hi = ranges[s]
-        lines += [f"[{d}]", f"Size={s}", f"Context={fd_context}", "Type=Scalable",
-                  f"MinSize={lo}", f"MaxSize={hi}", ""]
-    C.atomic_write(os.path.join(tdir, "index.theme"), "\n".join(lines))
+                lo, hi = ranges[s]
+                dirs.append((f"{s}x{s}/{ctx}", [f"Size={s}", f"Context={fd_context}", "Type=Scalable",
+                                                f"MinSize={lo}", f"MaxSize={hi}"]))
+    if cfg.get("embed"):
+        dirs += base.index_entries(cfg["embed"])
+    return _write_index(tdir, cfg["name"], "Monochrome icons generated by monotile", fallback, dirs)
+
+
+def _write_index(tdir, name, comment, inherits, dirs):
+    lines = ["[Icon Theme]", f"Name={name}", f"Comment={comment}",
+             f"Inherits={inherits},hicolor" if inherits != "hicolor" else "Inherits=hicolor",
+             "Directories=" + ",".join(d for d, _ in dirs), ""]
+    for d, entry in dirs:
+        lines += [f"[{d}]"] + entry + [""]
+    text = "\n".join(lines)
+    path = os.path.join(tdir, "index.theme")
+    if os.path.exists(path) and open(path, encoding="utf-8").read() == text:
+        return False
+    C.atomic_write(path, text)
+    return True
 
 
 def update_icon_cache(tdir):
@@ -475,7 +507,10 @@ def _generate(cfg, fallback, tdir, dry_run, workers):
 
     os.makedirs(tdir, exist_ok=True)
     open(os.path.join(tdir, MARKER), "a").close()
-    write_index(cfg, tdir, fallback, {m.split("/", 1)[0] for m, v in manifest.items() if not v.get("passthrough")})
+    if cfg.get("embed") and base.embed(tdir, cfg["embed"]):
+        changed = True
+    if write_index(cfg, tdir, fallback, {m.split("/", 1)[0] for m, v in manifest.items() if not v.get("passthrough")}):
+        changed = True
     C.atomic_write(_manifest_path(cfg), json.dumps(manifest, indent=1, sort_keys=True))
     if changed or not os.path.exists(os.path.join(tdir, "icon-theme.cache")):
         update_icon_cache(tdir)
@@ -501,7 +536,7 @@ def _lighten(job):
     C.atomic_write(dst, buf.getvalue(), mode="wb")
 
 
-def derive_light(dark_name, name, inherits, workers=None):
+def derive_light(dark_name, name, inherits, workers=None, embed=None):
     """Make the light scheme of a generated theme: every tile and line-art icon with its
     tones flipped (black symbol on a light-grey tile), folders and file types shared
     with the dark theme through folder links (the black folders suit both).
@@ -515,7 +550,7 @@ def derive_light(dark_name, name, inherits, workers=None):
     todo, changed = [], False
     for size in sorted(os.listdir(sdir)):
         sd = os.path.join(sdir, size)
-        if not os.path.isdir(sd):
+        if size == base.EMBED or not os.path.isdir(sd):
             continue
         for ctx in sorted(os.listdir(sd)):
             src_ctx, dst_ctx = os.path.join(sd, ctx), os.path.join(tdir, size, ctx)
@@ -556,11 +591,13 @@ def derive_light(dark_name, name, inherits, workers=None):
     else:
         for j in todo:
             _lighten(j)
-    idx = open(os.path.join(sdir, "index.theme"), encoding="utf-8").read()
-    idx = re.sub(r"(?m)^Name=.*$", f"Name={name}", idx, count=1)
-    idx = re.sub(r"(?m)^Inherits=.*$", f"Inherits={inherits},hicolor" if inherits != "hicolor" else "Inherits=hicolor", idx, count=1)
-    idx = re.sub(r"(?m)^Comment=.*$", "Comment=Monochrome icons for light themes, generated by monotile", idx, count=1)
-    C.atomic_write(os.path.join(tdir, "index.theme"), idx)
+    if embed and base.embed(tdir, embed):
+        changed = True
+    dirs = [(d, e) for d, e in base.sections(os.path.join(sdir, "index.theme")) if not d.startswith(base.EMBED + "/")]
+    if embed:
+        dirs += base.index_entries(embed)
+    if _write_index(tdir, name, "Monochrome icons for light themes, generated by monotile", inherits, dirs):
+        changed = True
     if todo or changed or not os.path.exists(os.path.join(tdir, "icon-theme.cache")):
         update_icon_cache(tdir)
     return {"redrawn": len(todo), "changed": bool(todo) or changed}

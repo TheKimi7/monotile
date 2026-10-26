@@ -83,7 +83,8 @@ def validate(cfg):
         v = out[key]
         if v is not None and (not isinstance(v, str) or not THEME_NAME_RE.match(v)):
             raise ValueError(f"{key}: not a valid icon theme name")
-    own = {out["name"]} | {out["name"] + s for s in ("-Circle", "-Squircle", "-Light-Circle", "-Light-Squircle")}
+    own = {out["name"]} | {out["name"] + s for s in ("-Circle", "-Squircle", "-Light-Circle", "-Light-Squircle",
+                                                      "-Circle-Dark", "-Squircle-Dark", "-Circle-Light", "-Squircle-Light")}
     if out["fallback"] in own or out["source"] in own:
         raise ValueError("source/fallback cannot be one of the generated themes")
     if out["shape"] not in ("circle", "squircle"):

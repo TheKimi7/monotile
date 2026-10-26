@@ -109,8 +109,8 @@ class Generate(FakeDesktop):
                                       "48x48/places": (48, "Places")})
         self.add_icon("Base", "48x48/places", "folder")
         theme.generate_all(self.cfg, "Base")
-        dark = os.path.join(C.icons_dir(), "Monotile-Circle")
-        light = os.path.join(C.icons_dir(), "Monotile-Light-Circle")
+        dark = os.path.join(C.icons_dir(), "Monotile-Circle-Dark")
+        light = os.path.join(C.icons_dir(), "Monotile-Circle-Light")
         from PIL import Image
         d = Image.open(os.path.join(dark, "48x48", "apps", "calc.png")).convert("RGBA")
         lt = Image.open(os.path.join(light, "48x48", "apps", "calc.png")).convert("RGBA")
@@ -122,10 +122,10 @@ class Generate(FakeDesktop):
         self.assertEqual(os.path.realpath(places), os.path.realpath(os.path.join(dark, "48x48", "places")))
         with open(os.path.join(light, "index.theme")) as f:
             self.assertIn("Inherits=Base,hicolor", f.read())
-        with open(os.path.join(C.icons_dir(), "Monotile-Light-Squircle", "index.theme")) as f:
-            self.assertIn("Inherits=Monotile-Light-Circle,Base,hicolor", f.read())
+        with open(os.path.join(C.icons_dir(), "Monotile-Squircle-Light", "index.theme")) as f:
+            self.assertIn("Inherits=Monotile-Circle-Light,Base,hicolor", f.read())
         before = os.stat(os.path.join(light, "48x48", "apps", "calc.png")).st_mtime_ns
-        self.assertEqual(theme.derive_light("Monotile-Circle", "Monotile-Light-Circle", "Base")["redrawn"], 0)
+        self.assertEqual(theme.derive_light("Monotile-Circle-Dark", "Monotile-Circle-Light", "Base")["redrawn"], 0)
         self.assertEqual(before, os.stat(os.path.join(light, "48x48", "apps", "calc.png")).st_mtime_ns)
         theme.remove_all(self.cfg)
         self.assertFalse(os.path.exists(light))

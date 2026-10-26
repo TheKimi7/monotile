@@ -68,16 +68,15 @@ missing = sorted(set(APPS) - {n for n, _ in items})
 if missing:
     print("not in the built-in icons, skipped:", ", ".join(missing))
 for shape in ("circle", "squircle"):
-    sheet, failed = contact_sheet(items, lambda p, s, shape=shape: converted(p, s, shape), columns=10)
-    out = os.path.join(HERE, f"demo-{shape}.png")
-    sheet.save(out)
-    print(f"{out}: {len(items)} apps, {failed} failed")
-
-sheet, failed = contact_sheet(items, lambda p, s: light(converted(p, s, "circle")), columns=10,
-                              bg=(242, 242, 242), label_fg=(90, 90, 90))
-out = os.path.join(HERE, "demo-light.png")
-sheet.save(out)
-print(f"{out}: {len(items)} apps, {failed} failed")
+    for mode in ("dark", "light"):
+        if mode == "dark":
+            sheet, failed = contact_sheet(items, lambda p, s, shape=shape: converted(p, s, shape), columns=10)
+        else:
+            sheet, failed = contact_sheet(items, lambda p, s, shape=shape: light(converted(p, s, shape)), columns=10,
+                                          bg=(242, 242, 242), label_fg=(90, 90, 90))
+        out = os.path.join(HERE, f"demo-{shape}-{mode}.png")
+        sheet.save(out)
+        print(f"{out}: {len(items)} apps, {failed} failed")
 
 shapes = {}
 sys_items = []

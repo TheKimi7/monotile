@@ -9,14 +9,25 @@ greyscale. monotile ships the icons it starts from, so no other icon theme is ne
 a normal icon theme, so your desktop shows it like any other theme, and it can keep
 that theme up to date as you install and remove apps.
 
-![30 common apps: original above, monotile below (circle)](docs/demo-circle.png)
+Four themes, original icon above, monotile below:
 
-<details><summary>Squircle tiles</summary>
+**Monotile-Circle-Dark**
 
-![30 common apps: original above, monotile below (squircle)](docs/demo-squircle.png)
-</details>
+![Monotile-Circle-Dark: 30 common apps](docs/demo-circle-dark.png)
 
-![Light scheme: black symbols on light-grey tiles (Monotile-Light-Circle)](docs/demo-light.png)
+**Monotile-Circle-Light**
+
+![Monotile-Circle-Light: 30 common apps](docs/demo-circle-light.png)
+
+**Monotile-Squircle-Dark**
+
+![Monotile-Squircle-Dark: 30 common apps](docs/demo-squircle-dark.png)
+
+**Monotile-Squircle-Light**
+
+![Monotile-Squircle-Light: 30 common apps](docs/demo-squircle-light.png)
+
+**Folders, file types and devices** (shared by all four)
 
 ![Folders black, file types greyscale, devices white line art](docs/demo-system.png)
 
@@ -132,8 +143,8 @@ No installation needed; run it straight from a clone:
 git clone https://github.com/TheKimi7/monotile.git
 cd monotile
 ./run-monotile preview -o preview.png   # before/after sheet of your apps; changes nothing
-./run-monotile apply                    # generate both themes and switch to Monotile-Circle
-./run-monotile apply --shape squircle   # or switch to Monotile-Squircle
+./run-monotile apply                    # generate both themes and switch to Monotile-Circle-Dark
+./run-monotile apply --shape squircle   # or switch to Monotile-Squircle-Dark
 ./run-monotile watch enable             # keep it updated when apps are installed or removed
 ```
 
@@ -147,8 +158,8 @@ You can also install it with `pipx install .` and run `monotile` instead of `./r
 | Command | What it does |
 |---|---|
 | `preview` | Renders a before/after contact sheet of your apps. Writes only the image. |
-| `generate` | Creates or updates two themes in `~/.local/share/icons`: **Monotile-Circle** (every icon) and **Monotile-Squircle** (only the app and menu tiles; inherits the rest from Monotile-Circle, so it costs seconds and a few MB). It also derives **Monotile-Light-Circle** and **Monotile-Light-Squircle** for light desktop themes: the same icons as a black symbol on a light-grey tile, with folders and file types shared with the dark themes (they inherit Monotile-Base-Light instead of Monotile-Base-Dark). All four show up in your desktop's icon theme list. Only changed icons are reconverted (in parallel; names that share one image are converted once and symlinked); `--dry-run` reports without writing. |
-| `apply` | Generates if needed, then sets Monotile-Circle or, with `--shape squircle`, Monotile-Squircle. Your previous theme is saved once. |
+| `generate` | Creates or updates two themes in `~/.local/share/icons`: **Monotile-Circle-Dark** (every icon) and **Monotile-Squircle-Dark** (only the app and menu tiles; inherits the rest from Monotile-Circle-Dark, so it costs seconds and a few MB). It also derives **Monotile-Circle-Light** and **Monotile-Squircle-Light** for light desktop themes: the same icons as a black symbol on a light-grey tile, with folders and file types shared with the dark themes (with dark panel and tray icons instead of light ones). All four show up in your desktop's icon theme list. Only changed icons are reconverted (in parallel; names that share one image are converted once and symlinked); `--dry-run` reports without writing. |
+| `apply` | Generates if needed, then sets Monotile-Circle-Dark or, with `--shape squircle`, Monotile-Squircle-Dark. Your previous theme is saved once. |
 | `revert` | Restores the icon theme you had before `apply`. |
 | `status` | Shows what is generated, active and watched. |
 | `audit` | Looks up every icon name (all of the source theme, your apps and menu categories) through GTK exactly as the desktop does, and lists any that still come from another theme. |
@@ -162,8 +173,8 @@ Style options work with `preview`, `generate` and `apply`, and are remembered:
 | `--shape` | which theme `apply` activates: `circle`, `squircle` | `circle` |
 | `--file-style` | folders and file types: `black` (black folders, greyscale files), `grey` (all greyscale) or `native` (white line art) | `black` |
 | `--tones` | `2` white stencil · `3` large grey bodies filled grey · `4` white / light grey / mid grey | `2` |
-| `--source` | icon theme to read app icons from | Monotile-Base (built in) |
-| `--fallback` | icon theme for everything that is not an app icon (folders, file types…) | your icon theme at first run |
+| `--source` | icon theme to read app icons from | built-in icons |
+| `--fallback` | icon theme to inherit everything not converted from, instead of the built-in icons | built-in icons |
 | `--name` | name prefix of the generated themes | `Monotile` |
 | `--contexts` (generate) | which kinds to convert: `apps,categories,places,mimetypes,devices,status,emblems,actions` | all |
 | `--context` (preview) | which kind to show in the preview sheet | `apps` |
@@ -248,14 +259,18 @@ temporary directory and an in-memory settings backend.
 ## Built-in icons
 
 `base/` is a trimmed copy of the [Papirus icon theme](https://github.com/PapirusDevelopmentTeam/papirus-icon-theme)
-(version in `base/VERSION`), so monotile does not depend on any installed theme. `generate`
-installs it as three hidden themes:
+(version in `base/VERSION`), so monotile does not depend on any installed theme:
 
-| Theme | Contents |
+| Folder | Contents |
 |---|---|
-| Monotile-Base | what monotile converts (64 px apps, devices, file types, default and black folders) plus small toolbar, status and symbolic icons |
-| Monotile-Base-Dark | light toolbar, panel and tray icons; what the dark themes inherit |
-| Monotile-Base-Light | dark panel and tray icons; what the light themes inherit |
+| `base/Monotile-Base` | what monotile converts (64 px apps, devices, file types, default and black folders) plus small toolbar, status and symbolic icons |
+| `base/Monotile-Base-Dark` | light toolbar, panel and tray icons for dark desktops |
+| `base/Monotile-Base-Light` | dark panel and tray icons for light desktops |
+
+monotile converts straight from `base/`. Monotile-Circle-Dark and Monotile-Circle-Light carry the
+rest inside themselves, in a `_base` folder listed after their own icons (Circle with the dark
+set, Light-Circle with the light set), so nothing else is installed and your icon theme list
+shows only the four Monotile themes. With `--fallback` another theme is inherited instead.
 
 Only one size of each converted icon is kept (monotile renders every size from SVG) and folder
 colour variants other than black are left out: 33 MB instead of Papirus's 250 MB. Rebuild it
